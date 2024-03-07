@@ -911,3 +911,62 @@ title: tag-a-title-override
 
 	b.AssertFileContent("public/tags/a/index.html", "Tag: tag-a-title-override|")
 }
+
+func TestTaxonomyLookupIssue12193(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['page','rss','section','sitemap']
+[taxonomies]
+author = 'authors'
+-- layouts/_default/list.html --
+{{ .Title }}|
+-- layouts/_default/author.terms.html --
+layouts/_default/author.terms.html
+-- content/authors/_index.md --
+---
+title: Authors Page
+---
+`
+
+	b := Test(t, files)
+
+	b.AssertFileExists("public/index.html", true)
+	b.AssertFileExists("public/authors/index.html", true)
+	b.AssertFileContent("public/authors/index.html", "layouts/_default/author.terms.html") // failing test
+}
+
+func TestTaxonomyNestedEmptySectionsIssue12188(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['rss','sitemap']
+defaultContentLanguage = 'en'
+defaultContentLanguageInSubdir = true
+[languages.en]
+weight = 1
+[languages.ja]
+weight = 2
+[taxonomies]
+'s1/category' = 's1/category'
+-- layouts/_default/single.html --
+{{ .Title }}|
+-- layouts/_default/list.html --
+{{ .Title }}|
+-- content/s1/p1.en.md --
+---
+title: p1
+---
+`
+
+	b := Test(t, files)
+
+	b.AssertFileExists("public/en/s1/index.html", true)
+	b.AssertFileExists("public/en/s1/p1/index.html", true)
+	b.AssertFileExists("public/en/s1/category/index.html", true)
+
+	b.AssertFileExists("public/ja/s1/index.html", false) // failing test
+	b.AssertFileExists("public/ja/s1/category/index.html", true)
+}
