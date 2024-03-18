@@ -28,15 +28,15 @@ import (
 	"github.com/bep/logg"
 	"github.com/gohugoio/hugo/cache/dynacache"
 	"github.com/gohugoio/hugo/deps"
+	"github.com/gohugoio/hugo/hugofs"
 	"github.com/gohugoio/hugo/hugofs/files"
 	"github.com/gohugoio/hugo/hugofs/glob"
+	"github.com/gohugoio/hugo/hugolib/segments"
 	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/output"
 	"github.com/gohugoio/hugo/publisher"
 	"github.com/gohugoio/hugo/source"
 	"github.com/gohugoio/hugo/tpl"
-
-	"github.com/gohugoio/hugo/hugofs"
 
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/loggers"
@@ -318,9 +318,20 @@ func (h *HugoSites) render(l logg.LevelLogger, config *BuildCfg) error {
 
 	i := 0
 	for _, s := range h.Sites {
+		segmentFilter := s.conf.C.SegmentFilter
+		if segmentFilter.ShouldExcludeCoarse(segments.SegmentMatcherFields{Lang: s.language.Lang}) {
+			l.Logf("skip language %q not matching segments set in --renderSegments", s.language.Lang)
+			continue
+		}
+
 		siteRenderContext.languageIdx = s.languagei
 		h.currentSite = s
 		for siteOutIdx, renderFormat := range s.renderFormats {
+			if segmentFilter.ShouldExcludeCoarse(segments.SegmentMatcherFields{Output: renderFormat.Name, Lang: s.language.Lang}) {
+				l.Logf("skip output format %q for language %q not matching segments set in --renderSegments", renderFormat.Name, s.language.Lang)
+				continue
+			}
+
 			siteRenderContext.outIdx = siteOutIdx
 			siteRenderContext.sitesOutIdx = i
 			i++
@@ -595,8 +606,10 @@ func (h *HugoSites) processPartial(ctx context.Context, l logg.LevelLogger, conf
 		return sb.String()
 	}))
 
+	// For a list of events for the different OSes, see the test output in https://github.com/bep/fsnotifyeventlister/.
 	events = h.fileEventsFilter(events)
 	events = h.fileEventsTranslate(events)
+	eventInfos := h.fileEventsApplyInfo(events)
 
 	logger := h.Log
 
@@ -631,36 +644,12 @@ func (h *HugoSites) processPartial(ctx context.Context, l logg.LevelLogger, conf
 		addedContentPaths []*paths.Path
 	)
 
-	for _, ev := range events {
-		removed := false
-		added := false
-
-		if ev.Op&fsnotify.Remove == fsnotify.Remove {
-			removed = true
-		}
-
-		fi, statErr := h.Fs.Source.Stat(ev.Name)
-
-		// Some editors (Vim) sometimes issue only a Rename operation when writing an existing file
-		// Sometimes a rename operation means that file has been renamed other times it means
-		// it's been updated.
-		if ev.Op.Has(fsnotify.Rename) {
-			// If the file is still on disk, it's only been updated, if it's not, it's been moved
-			if statErr != nil {
-				removed = true
-			}
-		}
-		if ev.Op.Has(fsnotify.Create) {
-			added = true
-		}
-
-		isChangedDir := statErr == nil && fi.IsDir()
-
+	for _, ev := range eventInfos {
 		cpss := h.BaseFs.ResolvePaths(ev.Name)
 		pss := make([]*paths.Path, len(cpss))
 		for i, cps := range cpss {
 			p := cps.Path
-			if removed && !paths.HasExt(p) {
+			if ev.removed && !paths.HasExt(p) {
 				// Assume this is a renamed/removed directory.
 				// For deletes, we walk up the tree to find the container (e.g. branch bundle),
 				// so we will catch this even if it is a file without extension.
@@ -671,7 +660,7 @@ func (h *HugoSites) processPartial(ctx context.Context, l logg.LevelLogger, conf
 			}
 
 			pss[i] = h.Configs.ContentPathParser.Parse(cps.Component, p)
-			if added && !isChangedDir && cps.Component == files.ComponentFolderContent {
+			if ev.added && !ev.isChangedDir && cps.Component == files.ComponentFolderContent {
 				addedContentPaths = append(addedContentPaths, pss[i])
 			}
 
@@ -683,9 +672,9 @@ func (h *HugoSites) processPartial(ctx context.Context, l logg.LevelLogger, conf
 			}
 		}
 
-		if removed {
+		if ev.removed {
 			changedPaths.deleted = append(changedPaths.deleted, pss...)
-		} else if isChangedDir {
+		} else if ev.isChangedDir {
 			changedPaths.changedDirs = append(changedPaths.changedDirs, pss...)
 		} else {
 			changedPaths.changedFiles = append(changedPaths.changedFiles, pss...)
@@ -792,6 +781,8 @@ func (h *HugoSites) processPartial(ctx context.Context, l logg.LevelLogger, conf
 			// It's hard to determine the exact change set of this,
 			// so be very coarse grained for now.
 			changes = append(changes, identity.GenghisKhan)
+		case files.ComponentFolderArchetypes:
+			// Ignore for now.
 		default:
 			panic(fmt.Sprintf("unknown component: %q", pathInfo.Component()))
 		}

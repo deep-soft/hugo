@@ -19,6 +19,7 @@ import (
 	"io"
 	"mime"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -297,7 +298,6 @@ func (s *siteRefLinker) refLink(ref string, source any, relative bool, outputFor
 	ref = filepath.ToSlash(ref)
 
 	refURL, err = url.Parse(ref)
-
 	if err != nil {
 		return s.notFoundURL, err
 	}
@@ -427,6 +427,73 @@ func (h *HugoSites) fileEventsFilter(events []fsnotify.Event) []fsnotify.Event {
 	return events[:n]
 }
 
+type fileEventInfo struct {
+	fsnotify.Event
+	fi           os.FileInfo
+	added        bool
+	removed      bool
+	isChangedDir bool
+}
+
+func (h *HugoSites) fileEventsApplyInfo(events []fsnotify.Event) []fileEventInfo {
+	var infos []fileEventInfo
+	for _, ev := range events {
+		removed := false
+		added := false
+
+		if ev.Op&fsnotify.Remove == fsnotify.Remove {
+			removed = true
+		}
+
+		fi, statErr := h.Fs.Source.Stat(ev.Name)
+
+		// Some editors (Vim) sometimes issue only a Rename operation when writing an existing file
+		// Sometimes a rename operation means that file has been renamed other times it means
+		// it's been updated.
+		if ev.Op.Has(fsnotify.Rename) {
+			// If the file is still on disk, it's only been updated, if it's not, it's been moved
+			if statErr != nil {
+				removed = true
+			}
+		}
+		if ev.Op.Has(fsnotify.Create) {
+			added = true
+		}
+
+		isChangedDir := statErr == nil && fi.IsDir()
+
+		infos = append(infos, fileEventInfo{
+			Event:        ev,
+			fi:           fi,
+			added:        added,
+			removed:      removed,
+			isChangedDir: isChangedDir,
+		})
+	}
+
+	n := 0
+
+	for _, ev := range infos {
+		// Remove any directories that's also represented by a file.
+		keep := true
+		if ev.isChangedDir {
+			for _, ev2 := range infos {
+				if ev2.fi != nil && !ev2.fi.IsDir() && filepath.Dir(ev2.Name) == ev.Name {
+					keep = false
+					break
+				}
+			}
+		}
+		if keep {
+			infos[n] = ev
+			n++
+		}
+	}
+	infos = infos[:n]
+
+	return infos
+}
+
 func (h *HugoSites) fileEventsTranslate(events []fsnotify.Event) []fsnotify.Event {
 	eventMap := make(map[string][]fsnotify.Event)
 
@@ -531,18 +598,13 @@ func (h *HugoSites) fileEventsContentPaths(p []pathChange) []pathChange {
 	return keepers
 }
 
-// HomeAbsURL is a convenience method giving the absolute URL to the home page.
-func (s *Site) HomeAbsURL() string {
-	base := ""
-	if len(s.conf.Languages) > 1 {
-		base = s.Language().Lang
-	}
-	return s.AbsURL(base, false)
-}
-
 // SitemapAbsURL is a convenience method giving the absolute URL to the sitemap.
 func (s *Site) SitemapAbsURL() string {
-	p := s.HomeAbsURL()
+	base := ""
+	if len(s.conf.Languages) > 1 || s.Conf.DefaultContentLanguageInSubdir() {
+		base = s.Language().Lang
+	}
+	p := s.AbsURL(base, false)
 	if !strings.HasSuffix(p, "/") {
 		p += "/"
 	}
@@ -681,7 +743,7 @@ func (s *Site) getLanguagePermalinkLang(alwaysInSubDir bool) string {
 		return ""
 	}
 
-	if s.h.Conf.IsMultiLingual() && alwaysInSubDir {
+	if s.h.Conf.IsMultilingual() && alwaysInSubDir {
 		return s.Language().Lang
 	}
 

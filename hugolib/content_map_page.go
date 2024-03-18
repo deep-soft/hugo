@@ -1500,13 +1500,6 @@ func (sa *sitePagesAssembler) assembleTermsAndTranslations() error {
 				return false, nil
 			}
 
-			// This is a little out of place, but is conveniently put here.
-			// Check if translationKey is set by user.
-			// This is to support the manual way of setting the translationKey in front matter.
-			if ps.m.pageConfig.TranslationKey != "" {
-				sa.s.h.translationKeyPages.Append(ps.m.pageConfig.TranslationKey, ps)
-			}
-
 			if sa.pageMap.cfg.taxonomyTermDisabled {
 				return false, nil
 			}
@@ -1586,6 +1579,13 @@ func (sa *sitePagesAssembler) assembleResources() error {
 		LockType: lockType,
 		Handle: func(s string, n contentNodeI, match doctree.DimensionFlag) (bool, error) {
 			ps := n.(*pageState)
+
+			// This is a little out of place, but is conveniently put here.
+			// Check if translationKey is set by user.
+			// This is to support the manual way of setting the translationKey in front matter.
+			if ps.m.pageConfig.TranslationKey != "" {
+				sa.s.h.translationKeyPages.Append(ps.m.pageConfig.TranslationKey, ps)
+			}
 
 			// Prepare resources for this page.
 			ps.shiftToOutputFormat(true, 0)
@@ -1778,7 +1778,7 @@ func (sa *sitePagesAssembler) addStandalonePages() error {
 
 	if sitemapEnabled {
 		addStandalone("/_sitemap", kinds.KindSitemap, output.SitemapFormat)
-		skipSitemapIndex := s.Conf.IsMultihost() || !(s.Conf.DefaultContentLanguageInSubdir() || s.Conf.IsMultiLingual())
+		skipSitemapIndex := s.Conf.IsMultihost() || !(s.Conf.DefaultContentLanguageInSubdir() || s.Conf.IsMultilingual())
 
 		if !skipSitemapIndex {
 			addStandalone("/_sitemapindex", kinds.KindSitemapIndex, output.SitemapIndexFormat)

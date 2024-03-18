@@ -22,6 +22,7 @@ import (
 
 	"github.com/gohugoio/hugo/hugofs"
 	"github.com/gohugoio/hugo/hugolib/doctree"
+	"github.com/gohugoio/hugo/hugolib/segments"
 	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/media"
 	"github.com/gohugoio/hugo/output"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/maps"
+	"github.com/gohugoio/hugo/common/types"
 
 	"github.com/gohugoio/hugo/source"
 
@@ -149,6 +151,19 @@ func (p *pageState) resetBuildState() {
 
 func (p *pageState) reusePageOutputContent() bool {
 	return p.pageOutputTemplateVariationsState.Load() == 1
+}
+
+func (p *pageState) skipRender() bool {
+	b := p.s.conf.C.SegmentFilter.ShouldExcludeFine(
+		segments.SegmentMatcherFields{
+			Path:   p.Path(),
+			Kind:   p.Kind(),
+			Lang:   p.Lang(),
+			Output: p.pageOutput.f.Name,
+		},
+	)
+
+	return b
 }
 
 func (po *pageState) isRenderedAny() bool {
@@ -729,5 +744,11 @@ func (p pageWithWeight0) Weight0() int {
 }
 
 func (p pageWithWeight0) page() page.Page {
+	return p.pageState
+}
+
+var _ types.Unwrapper = (*pageWithWeight0)(nil)
+
+func (p pageWithWeight0) Unwrapv() any {
 	return p.pageState
 }

@@ -447,15 +447,21 @@ func (s *Site) Params() maps.Params {
 	return s.conf.Params
 }
 
+// Deprecated: Use taxonomies instead.
 func (s *Site) Author() map[string]any {
+	hugo.Deprecate(".Site.Author", "Use taxonomies instead.", "v0.124.0")
 	return s.conf.Author
 }
 
+// Deprecated: Use taxonomies instead.
 func (s *Site) Authors() page.AuthorList {
+	hugo.Deprecate(".Site.Authors", "Use taxonomies instead.", "v0.124.0")
 	return page.AuthorList{}
 }
 
+// Deprecated: Use .Site.Params instead.
 func (s *Site) Social() map[string]string {
+	hugo.Deprecate(".Site.Social", "Use .Site.Params instead.", "v0.124.0")
 	return s.conf.Social
 }
 
@@ -484,10 +490,10 @@ func (s *Site) BuildDrafts() bool {
 	return s.conf.BuildDrafts
 }
 
-// Deprecated: Use hugo.IsMultiLingual instead.
+// Deprecated: Use hugo.IsMultilingual instead.
 func (s *Site) IsMultiLingual() bool {
-	hugo.Deprecate(".Site.IsMultiLingual", "Use hugo.IsMultiLingual instead.", "v0.124.0")
-	return s.h.isMultiLingual()
+	hugo.Deprecate(".Site.IsMultiLingual", "Use hugo.IsMultilingual instead.", "v0.124.0")
+	return s.h.isMultilingual()
 }
 
 func (s *Site) LanguagePrefix() string {

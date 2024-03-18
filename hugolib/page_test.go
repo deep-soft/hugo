@@ -709,7 +709,7 @@ func TestPageWithShortCodeInSummary(t *testing.T) {
 	assertFunc := func(t *testing.T, ext string, pages page.Pages) {
 		p := pages[0]
 		checkPageTitle(t, p, "Simple")
-		checkPageContent(t, p, normalizeExpected(ext, "<p>Summary Next Line. <figure><img src=\"/not/real\"/> </figure> . More text here.</p><p>Some more text</p>"))
+		checkPageContent(t, p, normalizeExpected(ext, "<p>Summary Next Line. <figure><img src=\"/not/real\"> </figure> . More text here.</p><p>Some more text</p>"))
 		checkPageSummary(t, p, "Summary Next Line.  . More text here. Some more text")
 		checkPageType(t, p, "page")
 	}
@@ -1348,6 +1348,51 @@ AllTranslations: {{ range .AllTranslations }}{{ .Language.Lang }}|{{ end }}|
 		"Translations: en||",
 		"AllTranslations: en|nn||",
 	)
+}
+
+func TestTranslationKeyTermPages(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['home','rss','section','sitemap','taxonomy']
+defaultContentLanguage = 'en'
+defaultContentLanguageInSubdir = true
+[languages.en]
+weight = 1
+[languages.pt]
+weight = 2
+[taxonomies]
+category = 'categories'
+-- layouts/_default/list.html --
+{{ .IsTranslated }}|{{ range .Translations }}{{ .RelPermalink }}|{{ end }}
+-- layouts/_default/single.html --
+{{ .Title }}|
+-- content/p1.en.md --
+---
+title: p1 (en)
+categories: [music]
+---
+-- content/p1.pt.md --
+---
+title: p1 (pt)
+categories: [música]
+---
+-- content/categories/music/_index.en.md --
+---
+title: music
+translationKey: foo
+---
+-- content/categories/música/_index.pt.md --
+---
+title: música
+translationKey: foo
+---
+`
+
+	b := Test(t, files)
+	b.AssertFileContent("public/en/categories/music/index.html", "true|/pt/categories/m%C3%BAsica/|")
+	b.AssertFileContent("public/pt/categories/música/index.html", "true|/en/categories/music/|")
 }
 
 // Issue #11540.

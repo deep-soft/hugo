@@ -269,7 +269,7 @@ func (h *HugoSites) pickOneAndLogTheRest(errors []error) error {
 	return errors[i]
 }
 
-func (h *HugoSites) isMultiLingual() bool {
+func (h *HugoSites) isMultilingual() bool {
 	return len(h.Sites) > 1
 }
 
@@ -410,6 +410,10 @@ type BuildCfg struct {
 
 // shouldRender returns whether this output format should be rendered or not.
 func (cfg *BuildCfg) shouldRender(p *pageState) bool {
+	if p.skipRender() {
+		return false
+	}
+
 	if !p.renderOnce {
 		return true
 	}
