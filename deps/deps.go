@@ -15,11 +15,14 @@ import (
 	"github.com/gohugoio/hugo/cache/filecache"
 	"github.com/gohugoio/hugo/common/hexec"
 	"github.com/gohugoio/hugo/common/loggers"
+	"github.com/gohugoio/hugo/common/maps"
+	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/config"
 	"github.com/gohugoio/hugo/config/allconfig"
 	"github.com/gohugoio/hugo/config/security"
 	"github.com/gohugoio/hugo/helpers"
 	"github.com/gohugoio/hugo/hugofs"
+	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/media"
 	"github.com/gohugoio/hugo/resources/page"
 	"github.com/gohugoio/hugo/resources/postpub"
@@ -85,7 +88,7 @@ type Deps struct {
 	BuildEndListeners *Listeners
 
 	// Resources that gets closed when the build is done or the server shuts down.
-	BuildClosers *Closers
+	BuildClosers *types.Closers
 
 	// This is common/global for all sites.
 	BuildState *BuildState
@@ -133,6 +136,15 @@ func (d *Deps) Init() error {
 	if d.BuildState == nil {
 		d.BuildState = &BuildState{}
 	}
+	if d.BuildState.DeferredExecutions == nil {
+		if d.BuildState.DeferredExecutionsGroupedByRenderingContext == nil {
+			d.BuildState.DeferredExecutionsGroupedByRenderingContext = make(map[tpl.RenderingContext]*DeferredExecutions)
+		}
+		d.BuildState.DeferredExecutions = &DeferredExecutions{
+			Executions:              maps.NewCache[string, *tpl.DeferredExecution](),
+			FilenamesWithPostPrefix: maps.NewCache[string, bool](),
+		}
+	}
 
 	if d.BuildStartListeners == nil {
 		d.BuildStartListeners = &Listeners{}
@@ -143,7 +155,7 @@ func (d *Deps) Init() error {
 	}
 
 	if d.BuildClosers == nil {
-		d.BuildClosers = &Closers{}
+		d.BuildClosers = &types.Closers{}
 	}
 
 	if d.Metrics == nil && d.Conf.TemplateMetrics() {
@@ -151,28 +163,37 @@ func (d *Deps) Init() error {
 	}
 
 	if d.ExecHelper == nil {
-		d.ExecHelper = hexec.New(d.Conf.GetConfigSection("security").(security.Config))
+		d.ExecHelper = hexec.New(d.Conf.GetConfigSection("security").(security.Config), d.Conf.WorkingDir())
 	}
 
 	if d.MemCache == nil {
-		d.MemCache = dynacache.New(dynacache.Options{Running: d.Conf.Running(), Log: d.Log})
+		d.MemCache = dynacache.New(dynacache.Options{Watching: d.Conf.Watching(), Log: d.Log})
 	}
 
 	if d.PathSpec == nil {
-		hashBytesReceiverFunc := func(name string, match bool) {
-			if !match {
-				return
+		hashBytesReceiverFunc := func(name string, match []byte) {
+			s := string(match)
+			switch s {
+			case postpub.PostProcessPrefix:
+				d.BuildState.AddFilenameWithPostPrefix(name)
+			case tpl.HugoDeferredTemplatePrefix:
+				d.BuildState.DeferredExecutions.FilenamesWithPostPrefix.Set(name, true)
 			}
-			d.BuildState.AddFilenameWithPostPrefix(name)
 		}
 
 		// Skip binary files.
 		mediaTypes := d.Conf.GetConfigSection("mediaTypes").(media.Types)
-		hashBytesSHouldCheck := func(name string) bool {
+		hashBytesShouldCheck := func(name string) bool {
 			ext := strings.TrimPrefix(filepath.Ext(name), ".")
 			return mediaTypes.IsTextSuffix(ext)
 		}
-		d.Fs.PublishDir = hugofs.NewHasBytesReceiver(d.Fs.PublishDir, hashBytesSHouldCheck, hashBytesReceiverFunc, []byte(postpub.PostProcessPrefix))
+		d.Fs.PublishDir = hugofs.NewHasBytesReceiver(
+			d.Fs.PublishDir,
+			hashBytesShouldCheck,
+			hashBytesReceiverFunc,
+			[]byte(tpl.HugoDeferredTemplatePrefix),
+			[]byte(postpub.PostProcessPrefix))
+
 		pathSpec, err := helpers.NewPathSpec(d.Fs, d.Conf, d.Log)
 		if err != nil {
 			return err
@@ -208,7 +229,7 @@ func (d *Deps) Init() error {
 		return fmt.Errorf("failed to create file caches from configuration: %w", err)
 	}
 
-	resourceSpec, err := resources.NewSpec(d.PathSpec, common, fileCaches, d.MemCache, d.BuildState, d.Log, d, d.ExecHelper)
+	resourceSpec, err := resources.NewSpec(d.PathSpec, common, fileCaches, d.MemCache, d.BuildState, d.Log, d, d.ExecHelper, d.BuildClosers, d.BuildState)
 	if err != nil {
 		return fmt.Errorf("failed to create resource spec: %w", err)
 	}
@@ -353,6 +374,9 @@ type DepsCfg struct {
 
 	// i18n handling.
 	TranslationProvider ResourceProvider
+
+	// ChangesFromBuild for changes passed back to the server/watch process.
+	ChangesFromBuild chan []identity.Identity
 }
 
 // BuildState are state used during a build.
@@ -361,9 +385,44 @@ type BuildState struct {
 
 	mu sync.Mutex // protects state below.
 
+	OnSignalRebuild func(ids ...identity.Identity)
+
 	// A set of filenames in /public that
 	// contains a post-processing prefix.
 	filenamesWithPostPrefix map[string]bool
+
+	DeferredExecutions *DeferredExecutions
+
+	// Deferred executions grouped by rendering context.
+	DeferredExecutionsGroupedByRenderingContext map[tpl.RenderingContext]*DeferredExecutions
+}
+
+type DeferredExecutions struct {
+	// A set of filenames in /public that
+	// contains a post-processing prefix.
+	FilenamesWithPostPrefix *maps.Cache[string, bool]
+
+	// Maps a placeholder to a deferred execution.
+	Executions *maps.Cache[string, *tpl.DeferredExecution]
+}
+
+var _ identity.SignalRebuilder = (*BuildState)(nil)
+
+// StartStageRender will be called before a stage is rendered.
+func (b *BuildState) StartStageRender(stage tpl.RenderingContext) {
+}
+
+// StopStageRender will be called after a stage is rendered.
+func (b *BuildState) StopStageRender(stage tpl.RenderingContext) {
+	b.DeferredExecutionsGroupedByRenderingContext[stage] = b.DeferredExecutions
+	b.DeferredExecutions = &DeferredExecutions{
+		Executions:              maps.NewCache[string, *tpl.DeferredExecution](),
+		FilenamesWithPostPrefix: maps.NewCache[string, bool](),
+	}
+}
+
+func (b *BuildState) SignalRebuild(ids ...identity.Identity) {
+	b.OnSignalRebuild(ids...)
 }
 
 func (b *BuildState) AddFilenameWithPostPrefix(filename string) {
@@ -388,31 +447,4 @@ func (b *BuildState) GetFilenamesWithPostPrefix() []string {
 
 func (b *BuildState) Incr() int {
 	return int(atomic.AddUint64(&b.counter, uint64(1)))
-}
-
-type Closer interface {
-	Close() error
-}
-
-type Closers struct {
-	mu sync.Mutex
-	cs []Closer
-}
-
-func (cs *Closers) Add(c Closer) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	cs.cs = append(cs.cs, c)
-}
-
-func (cs *Closers) Close() error {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	for _, c := range cs.cs {
-		c.Close()
-	}
-
-	cs.cs = cs.cs[:0]
-
-	return nil
 }

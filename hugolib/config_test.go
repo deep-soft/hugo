@@ -490,11 +490,10 @@ name = "menu-theme"
 			got := b.Configs.Base
 
 			if mergeStrategy == "none" {
-				b.Assert(got.Sitemap, qt.DeepEquals, config.SitemapConfig{ChangeFreq: "", Priority: -1, Filename: "sitemap.xml"})
-
+				b.Assert(got.Sitemap, qt.DeepEquals, config.SitemapConfig{ChangeFreq: "", Disable: false, Priority: -1, Filename: "sitemap.xml"})
 				b.AssertFileContent("public/sitemap.xml", "schemas/sitemap")
 			} else {
-				b.Assert(got.Sitemap, qt.DeepEquals, config.SitemapConfig{ChangeFreq: "monthly", Priority: -1, Filename: "sitemap.xml"})
+				b.Assert(got.Sitemap, qt.DeepEquals, config.SitemapConfig{ChangeFreq: "monthly", Disable: false, Priority: -1, Filename: "sitemap.xml"})
 				b.AssertFileContent("public/sitemap.xml", "<changefreq>monthly</changefreq>")
 			}
 		})
@@ -1145,7 +1144,7 @@ Home.
 
 	enConfig := b.H.Sites[0].conf
 	m, _ := enConfig.MediaTypes.Config.GetByType("text/html")
-	b.Assert(m.Suffixes(), qt.DeepEquals, []string{"html"})
+	b.Assert(m.Suffixes(), qt.DeepEquals, []string{"html", "htm"})
 
 	svConfig := b.H.Sites[1].conf
 	f, _ := svConfig.OutputFormats.Config.GetByName("html")

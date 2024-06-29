@@ -51,7 +51,8 @@ title: s1/p1
 title: s1/p2
 ---
 [500](a.txt) // global resource
-[600](b.txt) // page resource
+[510](b.txt) // page resource
+[520](./b.txt) // page resource
 -- content/s1/p2/b.txt --
 irrelevant
 -- content/s1/p3.md --
@@ -125,35 +126,49 @@ title: s1/p3
 
 	b.AssertFileContent("public/s1/p2/index.html",
 		`<a href="/a.txt">500</a>`,
-		`<a href="/s1/p2/b.txt">600</a>`,
+		`<a href="/s1/p2/b.txt">510</a>`,
+		`<a href="/s1/p2/b.txt">520</a>`,
 	)
 }
 
 // Issue 12203
-func TestEmbeddedImageRenderHookMarkdownAttributes(t *testing.T) {
+// Issue 12468
+// Issue 12514
+func TestEmbeddedImageRenderHook(t *testing.T) {
 	t.Parallel()
 
 	files := `
 -- config.toml --
-disableKinds = ['page','rss','section','sitemap','taxonomy','term']
+baseURL = 'https://example.org/dir/'
+disableKinds = ['home','rss','section','sitemap','taxonomy','term']
 [markup.goldmark.parser]
 wrapStandAloneImageWithinParagraph = false
 [markup.goldmark.parser.attribute]
 block = false
 [markup.goldmark.renderHooks.image]
 enableDefault = true
--- content/_index.md --
-![alt](a.jpg)
+-- content/p1/index.md --
+![alt1](./pixel.png)
+
+![alt2](pixel.png?a=b&c=d#fragment)
 {.foo #bar}
--- layouts/index.html --
+-- content/p1/pixel.png --
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==
+-- layouts/_default/single.html --
 {{ .Content }}
 `
 
 	b := hugolib.Test(t, files)
-	b.AssertFileContent("public/index.html", `<img alt="alt" src="a.jpg">`)
+	b.AssertFileContent("public/p1/index.html",
+		`<img alt="alt1" src="/dir/p1/pixel.png">`,
+		`<img alt="alt2" src="/dir/p1/pixel.png?a=b&c=d#fragment">`,
+	)
 
 	files = strings.Replace(files, "block = false", "block = true", -1)
 
 	b = hugolib.Test(t, files)
-	b.AssertFileContent("public/index.html", `<img alt="alt" class="foo" id="bar" src="a.jpg">`)
+	b.AssertFileContent("public/p1/index.html",
+		`<img alt="alt1" src="/dir/p1/pixel.png">`,
+		`<img alt="alt2" class="foo" id="bar" src="/dir/p1/pixel.png?a=b&c=d#fragment">`,
+	)
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/gohugoio/hugo/config/allconfig"
 	"github.com/gohugoio/hugo/deps"
 	"github.com/gohugoio/hugo/hugolib/doctree"
+	"github.com/gohugoio/hugo/hugolib/pagesfromdata"
 	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/langs"
 	"github.com/gohugoio/hugo/langs/i18n"
@@ -51,7 +52,15 @@ import (
 
 var _ page.Site = (*Site)(nil)
 
+type siteState int
+
+const (
+	siteStateInit siteState = iota
+	siteStateReady
+)
+
 type Site struct {
+	state     siteState
 	conf      *allconfig.Config
 	language  *langs.Language
 	languagei int
@@ -78,10 +87,6 @@ type Site struct {
 	siteRefLinker
 	publisher          publisher.Publisher
 	frontmatterHandler pagemeta.FrontMatterHandler
-
-	// We render each site for all the relevant output formats in serial with
-	// this rendering context pointing to the current one.
-	rc *siteRenderingContext
 
 	// The output formats that we need to render this site in. This slice
 	// will be fixed once set.
@@ -123,19 +128,32 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 			HandlerPost:        logHookLast,
 			Stdout:             cfg.LogOut,
 			Stderr:             cfg.LogOut,
-			StoreErrors:        conf.Running(),
+			StoreErrors:        conf.Watching(),
 			SuppressStatements: conf.IgnoredLogs(),
 		}
 		logger = loggers.New(logOpts)
 
 	}
 
-	memCache := dynacache.New(dynacache.Options{Running: conf.Running(), Log: logger})
+	memCache := dynacache.New(dynacache.Options{Watching: conf.Watching(), Log: logger})
+
+	var h *HugoSites
+	onSignalRebuild := func(ids ...identity.Identity) {
+		// This channel is buffered, but make sure we do this in a non-blocking way.
+		if cfg.ChangesFromBuild != nil {
+			go func() {
+				cfg.ChangesFromBuild <- ids
+			}()
+		}
+	}
 
 	firstSiteDeps := &deps.Deps{
-		Fs:                  cfg.Fs,
-		Log:                 logger,
-		Conf:                conf,
+		Fs:   cfg.Fs,
+		Log:  logger,
+		Conf: conf,
+		BuildState: &deps.BuildState{
+			OnSignalRebuild: onSignalRebuild,
+		},
 		MemCache:            memCache,
 		TemplateProvider:    tplimpl.DefaultTemplateProvider,
 		TranslationProvider: i18n.NewTranslationProvider(),
@@ -166,7 +184,8 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 		treeResources: doctree.New(
 			treeConfig,
 		),
-		treeTaxonomyEntries: doctree.NewTreeShiftTree[*weightedContentNode](doctree.DimensionLanguage.Index(), len(confm.Languages)),
+		treeTaxonomyEntries:           doctree.NewTreeShiftTree[*weightedContentNode](doctree.DimensionLanguage.Index(), len(confm.Languages)),
+		treePagesFromTemplateAdapters: doctree.NewTreeShiftTree[*pagesfromdata.PagesFromTemplate](doctree.DimensionLanguage.Index(), len(confm.Languages)),
 	}
 
 	pageTrees.createMutableTrees()
@@ -251,7 +270,8 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 		return li.Lang < lj.Lang
 	})
 
-	h, err := newHugoSites(cfg, firstSiteDeps, pageTrees, sites)
+	var err error
+	h, err = newHugoSites(cfg, firstSiteDeps, pageTrees, sites)
 	if err == nil && h == nil {
 		panic("hugo: newHugoSitesNew returned nil error and nil HugoSites")
 	}
@@ -415,6 +435,7 @@ func (s *Site) Current() page.Site {
 
 // MainSections returns the list of main sections.
 func (s *Site) MainSections() []string {
+	s.CheckReady()
 	return s.conf.C.MainSections
 }
 
@@ -433,6 +454,7 @@ func (s *Site) BaseURL() string {
 
 // Deprecated: Use .Site.Lastmod instead.
 func (s *Site) LastChange() time.Time {
+	s.CheckReady()
 	hugo.Deprecate(".Site.LastChange", "Use .Site.Lastmod instead.", "v0.123.0")
 	return s.lastmod
 }
@@ -449,7 +471,9 @@ func (s *Site) Params() maps.Params {
 
 // Deprecated: Use taxonomies instead.
 func (s *Site) Author() map[string]any {
-	hugo.Deprecate(".Site.Author", "Use taxonomies instead.", "v0.124.0")
+	if len(s.conf.Author) != 0 {
+		hugo.Deprecate(".Site.Author", "Use taxonomies instead.", "v0.124.0")
+	}
 	return s.conf.Author
 }
 
@@ -519,6 +543,7 @@ func (s *Site) ForEeachIdentityByName(name string, f func(identity.Identity) boo
 // Pages returns all pages.
 // This is for the current language only.
 func (s *Site) Pages() page.Pages {
+	s.CheckReady()
 	return s.pageMap.getPagesInSection(
 		pageMapQueryPagesInSection{
 			pageMapQueryPagesBelowPath: pageMapQueryPagesBelowPath{
@@ -535,6 +560,7 @@ func (s *Site) Pages() page.Pages {
 // RegularPages returns all the regular pages.
 // This is for the current language only.
 func (s *Site) RegularPages() page.Pages {
+	s.CheckReady()
 	return s.pageMap.getPagesInSection(
 		pageMapQueryPagesInSection{
 			pageMapQueryPagesBelowPath: pageMapQueryPagesBelowPath{
@@ -549,10 +575,18 @@ func (s *Site) RegularPages() page.Pages {
 
 // AllPages returns all pages for all sites.
 func (s *Site) AllPages() page.Pages {
+	s.CheckReady()
 	return s.h.Pages()
 }
 
 // AllRegularPages returns all regular pages for all sites.
 func (s *Site) AllRegularPages() page.Pages {
+	s.CheckReady()
 	return s.h.RegularPages()
+}
+
+func (s *Site) CheckReady() {
+	if s.state != siteStateReady {
+		panic("this method cannot be called before the site is fully initialized")
+	}
 }

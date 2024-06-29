@@ -27,6 +27,7 @@ import (
 	"github.com/gohugoio/hugo/deps"
 	"github.com/gohugoio/hugo/helpers"
 	"github.com/gohugoio/hugo/tpl"
+	"github.com/rogpeppe/go-internal/diff"
 
 	"github.com/spf13/cast"
 )
@@ -161,15 +162,32 @@ func (ns *Namespace) ContainsAny(s, chars any) (bool, error) {
 // ContainsNonSpace reports whether s contains any non-space characters as defined
 // by Unicode's White Space property,
 // <docsmeta>{"newIn": "0.111.0" }</docsmeta>
-func (ns *Namespace) ContainsNonSpace(s any) bool {
-	ss := cast.ToString(s)
+func (ns *Namespace) ContainsNonSpace(s any) (bool, error) {
+	ss, err := cast.ToStringE(s)
+	if err != nil {
+		return false, err
+	}
 
 	for _, r := range ss {
 		if !unicode.IsSpace(r) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
+}
+
+// Diff returns an anchored diff of the two texts old and new in the “unified
+// diff” format. If old and new are identical, Diff returns an empty string.
+func (ns *Namespace) Diff(oldname string, old any, newname string, new any) (string, error) {
+	olds, err := cast.ToStringE(old)
+	if err != nil {
+		return "", err
+	}
+	news, err := cast.ToStringE(new)
+	if err != nil {
+		return "", err
+	}
+	return string(diff.Diff(oldname, []byte(olds), newname, []byte(news))), nil
 }
 
 // HasPrefix tests whether the input s begins with prefix.

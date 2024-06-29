@@ -194,8 +194,8 @@ func (l configLoader) applyDefaultConfig() error {
 		"footnoteAnchorPrefix":                 "",
 		"footnoteReturnLinkContents":           "",
 		"newContentEditor":                     "",
-		"paginate":                             10,
-		"paginatePath":                         "page",
+		"paginate":                             0,  // Moved into the paginator struct in Hugo v0.128.0.
+		"paginatePath":                         "", // Moved into the paginator struct in Hugo v0.128.0.
 		"summaryLength":                        70,
 		"rssLimit":                             -1,
 		"sectionPagesMenu":                     "",
@@ -458,6 +458,7 @@ func (l *configLoader) loadModules(configs *Configs) (modules.ModulesConfig, *mo
 	conf := configs.Base
 	workingDir := bcfg.WorkingDir
 	themesDir := bcfg.ThemesDir
+	publishDir := bcfg.PublishDir
 
 	cfg := configs.LoadingInfo.Cfg
 
@@ -466,7 +467,7 @@ func (l *configLoader) loadModules(configs *Configs) (modules.ModulesConfig, *mo
 		ignoreVendor, _ = hglob.GetGlob(hglob.NormalizePath(s))
 	}
 
-	ex := hexec.New(conf.Security)
+	ex := hexec.New(conf.Security, workingDir)
 
 	hook := func(m *modules.ModulesConfig) error {
 		for _, tc := range m.AllModules {
@@ -492,6 +493,7 @@ func (l *configLoader) loadModules(configs *Configs) (modules.ModulesConfig, *mo
 		HookBeforeFinalize: hook,
 		WorkingDir:         workingDir,
 		ThemesDir:          themesDir,
+		PublishDir:         publishDir,
 		Environment:        l.Environment,
 		CacheDir:           conf.Caches.CacheDirModules(),
 		ModuleConfig:       conf.Module,

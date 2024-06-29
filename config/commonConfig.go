@@ -98,10 +98,6 @@ type BuildConfig struct {
 	// One of never, fallback, always. Default is fallback
 	UseResourceCacheWhen string
 
-	// When enabled, will duplicate bundled resource files across languages that
-	// doesn't have a translated version.
-	DuplicateResourceFiles bool
-
 	// When enabled, will collect and write a hugo_stats.json with some build
 	// related aggregated data (e.g. CSS class names).
 	// Note that this was a bool <= v0.115.0.
@@ -215,6 +211,8 @@ type SitemapConfig struct {
 	Priority float64
 	// The sitemap filename.
 	Filename string
+	// Whether to disable page inclusion.
+	Disable bool
 }
 
 func DecodeSitemap(prototype SitemapConfig, input map[string]any) (SitemapConfig, error) {
@@ -411,4 +409,16 @@ func DecodeServer(cfg Provider) (Server, error) {
 	}
 
 	return *s, nil
+}
+
+// Pagination configures the pagination behavior.
+type Pagination struct {
+	//  Default number of elements per pager in pagination.
+	PagerSize int
+
+	// The path element used during pagination.
+	Path string
+
+	// Whether to disable generation of alias for the first pagination page.
+	DisableAliases bool
 }

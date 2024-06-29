@@ -71,6 +71,9 @@ func (c ConfigLanguage) Environment() string {
 }
 
 func (c ConfigLanguage) IsMultihost() bool {
+	if len(c.m.Languages)-len(c.config.C.DisabledLanguages) <= 1 {
+		return false
+	}
 	return c.m.IsMultihost
 }
 
@@ -141,6 +144,10 @@ func (c ConfigLanguage) NewIdentityManager(name string) identity.Manager {
 	return identity.NewManager(name)
 }
 
+func (c ConfigLanguage) ContentTypes() config.ContentTypesProvider {
+	return c.config.C.ContentTypes
+}
+
 // GetConfigSection is mostly used in tests. The switch statement isn't complete, but what's in use.
 func (c ConfigLanguage) GetConfigSection(s string) any {
 	switch s {
@@ -166,6 +173,8 @@ func (c ConfigLanguage) GetConfigSection(s string) any {
 		return c.m.Modules
 	case "deployment":
 		return c.config.Deployment
+	case "httpCacheCompiled":
+		return c.config.C.HTTPCache
 	default:
 		panic("not implemented: " + s)
 	}
@@ -239,12 +248,8 @@ func (c ConfigLanguage) CreateTitle(s string) string {
 	return c.config.C.CreateTitle(s)
 }
 
-func (c ConfigLanguage) Paginate() int {
-	return c.config.Paginate
-}
-
-func (c ConfigLanguage) PaginatePath() string {
-	return c.config.PaginatePath
+func (c ConfigLanguage) Pagination() config.Pagination {
+	return c.config.Pagination
 }
 
 func (c ConfigLanguage) StaticDirs() []string {

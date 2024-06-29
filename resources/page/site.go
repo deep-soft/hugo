@@ -134,13 +134,26 @@ type Site interface {
 
 	// Deprecated: Use .Site.Home.OutputFormats.Get "rss" instead.
 	RSSLink() template.URL
+
+	// For internal use only.
+	// This will panic if the site is not fully initialized.
+	// This is typically used to inform the user in the content adapter templates,
+	// as these are executed before all the page collections etc. are ready to use.
+	CheckReady()
 }
 
 // Sites represents an ordered list of sites (languages).
 type Sites []Site
 
-// First is a convenience method to get the first Site, i.e. the main language.
+// Deprecated: Use .Sites.Default instead.
 func (s Sites) First() Site {
+	hugo.Deprecate(".Sites.First", "Use .Sites.Default instead.", "v0.127.0")
+	return s.Default()
+}
+
+// Default is a convenience method to get the site corresponding to the default
+// content language.
+func (s Sites) Default() Site {
 	if len(s) == 0 {
 		return nil
 	}
@@ -165,7 +178,7 @@ func (s *siteWrapper) Key() string {
 	return s.s.Language().Lang
 }
 
-// // Deprecated: Use .Site.Params instead.
+// Deprecated: Use .Site.Params instead.
 func (s *siteWrapper) Social() map[string]string {
 	return s.s.Social()
 }
@@ -317,6 +330,11 @@ func (s *siteWrapper) RSSLink() template.URL {
 // For internal use only.
 func (s *siteWrapper) ForEeachIdentityByName(name string, f func(identity.Identity) bool) {
 	s.s.(identity.ForEeachIdentityByNameProvider).ForEeachIdentityByName(name, f)
+}
+
+// For internal use only.
+func (s *siteWrapper) CheckReady() {
+	s.s.CheckReady()
 }
 
 type testSite struct {
@@ -471,6 +489,9 @@ func (s testSite) Param(key any) (any, error) {
 // Deprecated: Use .Site.Home.OutputFormats.Get "rss" instead.
 func (s testSite) RSSLink() template.URL {
 	return ""
+}
+
+func (s testSite) CheckReady() {
 }
 
 // NewDummyHugoSite creates a new minimal test site.

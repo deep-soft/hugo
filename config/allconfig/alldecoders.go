@@ -18,6 +18,8 @@ import (
 	"strings"
 
 	"github.com/gohugoio/hugo/cache/filecache"
+
+	"github.com/gohugoio/hugo/cache/httpcache"
 	"github.com/gohugoio/hugo/common/maps"
 	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/config"
@@ -92,6 +94,18 @@ var allDecoderSetups = map[string]decodeWeight{
 					cache.MaxAge = 0
 					p.c.Caches[k] = cache
 				}
+			}
+			return err
+		},
+	},
+	"httpcache": {
+		key: "httpcache",
+		decode: func(d decodeWeight, p decodeConfig) error {
+			var err error
+			p.c.HTTPCache, err = httpcache.DecodeConfig(p.bcfg, p.p.GetStringMap(d.key))
+			if p.c.IgnoreCache {
+				p.c.HTTPCache.Cache.For.Excludes = []string{"**"}
+				p.c.HTTPCache.Cache.For.Includes = []string{}
 			}
 			return err
 		},
@@ -311,6 +325,22 @@ var allDecoderSetups = map[string]decodeWeight{
 			var err error
 			p.c.Menus, err = navigation.DecodeConfig(p.p.Get(d.key))
 			return err
+		},
+	},
+	"pagination": {
+		key: "pagination",
+		decode: func(d decodeWeight, p decodeConfig) error {
+			p.c.Pagination = config.Pagination{
+				PagerSize: 10,
+				Path:      "page",
+			}
+			if p.p.IsSet(d.key) {
+				if err := mapstructure.WeakDecode(p.p.Get(d.key), &p.c.Pagination); err != nil {
+					return err
+				}
+			}
+
+			return nil
 		},
 	},
 	"privacy": {

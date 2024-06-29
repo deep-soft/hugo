@@ -380,7 +380,9 @@ func (p *pageState) TranslationKey() string {
 // AllTranslations returns all translations, including the current Page.
 func (p *pageState) AllTranslations() page.Pages {
 	key := p.Path() + "/" + "translations-all"
-	pages, err := p.s.pageMap.getOrCreatePagesFromCache(key, func(string) (page.Pages, error) {
+	// This is called from Translations, so we need to use a different partition, cachePages2,
+	// to avoid potential deadlocks.
+	pages, err := p.s.pageMap.getOrCreatePagesFromCache(p.s.pageMap.cachePages2, key, func(string) (page.Pages, error) {
 		if p.m.pageConfig.TranslationKey != "" {
 			// translationKey set by user.
 			pas, _ := p.s.h.translationKeyPages.Get(p.m.pageConfig.TranslationKey)
@@ -413,7 +415,7 @@ func (p *pageState) AllTranslations() page.Pages {
 // Translations returns the translations excluding the current Page.
 func (p *pageState) Translations() page.Pages {
 	key := p.Path() + "/" + "translations"
-	pages, err := p.s.pageMap.getOrCreatePagesFromCache(key, func(string) (page.Pages, error) {
+	pages, err := p.s.pageMap.getOrCreatePagesFromCache(nil, key, func(string) (page.Pages, error) {
 		var pas page.Pages
 		for _, pp := range p.AllTranslations() {
 			if !pp.Eq(p) {
@@ -508,9 +510,15 @@ func (p *pageState) renderResources() error {
 				continue
 			}
 
+			if _, isWrapper := r.(resource.ResourceWrapper); isWrapper {
+				// Skip resources that are wrapped.
+				// These gets published on its own.
+				continue
+			}
+
 			src, ok := r.(resource.Source)
 			if !ok {
-				initErr = fmt.Errorf("resource %T does not support resource.Source", src)
+				initErr = fmt.Errorf("resource %T does not support resource.Source", r)
 				return
 			}
 
@@ -579,7 +587,11 @@ func (p *pageState) getPageInfoForError() string {
 func (p *pageState) getContentConverter() converter.Converter {
 	var err error
 	p.contentConverterInit.Do(func() {
-		markup := p.m.pageConfig.Markup
+		if p.m.pageConfig.ContentMediaType.IsZero() {
+			panic("ContentMediaType not set")
+		}
+		markup := p.m.pageConfig.ContentMediaType.SubType
+
 		if markup == "html" {
 			// Only used for shortcode inner content.
 			markup = "markdown"

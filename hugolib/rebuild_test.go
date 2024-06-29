@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/htesting"
+	"github.com/gohugoio/hugo/markup/asciidocext"
 	"github.com/gohugoio/hugo/resources/resource_transformers/tocss/dartsass"
 	"github.com/gohugoio/hugo/resources/resource_transformers/tocss/scss"
 )
@@ -52,6 +53,11 @@ title: "Home"
 Home Content.
 -- content/hometext.txt --
 Home Text Content.
+-- content/myothersection/myothersectionpage.md --
+---
+title: "myothersectionpage"
+---
+myothersectionpage Content.
 -- layouts/_default/single.html --
 Single: {{ .Title }}|{{ .Content }}$
 Resources: {{ range $i, $e := .Resources }}{{ $i }}:{{ .RelPermalink }}|{{ .Content }}|{{ end }}$
@@ -120,14 +126,23 @@ func TestRebuildEditTextFileInBranchBundle(t *testing.T) {
 	b.AssertRenderCountContent(1)
 }
 
-func TestRebuildRenameTextFileInLeafBundle(t *testing.T) {
-	b := TestRunning(t, rebuildFilesSimple)
-	b.AssertFileContent("public/mysection/mysectionbundle/index.html", "My Section Bundle Text 2 Content.", "Len Resources: 2|")
+func testRebuildBothWatchingAndRunning(t *testing.T, files string, withB func(b *IntegrationTestBuilder)) {
+	t.Helper()
+	for _, opt := range []TestOpt{TestOptWatching(), TestOptRunning()} {
+		b := Test(t, files, opt)
+		withB(b)
+	}
+}
 
-	b.RenameFile("content/mysection/mysectionbundle/mysectionbundletext.txt", "content/mysection/mysectionbundle/mysectionbundletext2.txt").Build()
-	b.AssertFileContent("public/mysection/mysectionbundle/index.html", "mysectionbundletext2", "My Section Bundle Text 2 Content.", "Len Resources: 2|")
-	b.AssertRenderCountPage(3)
-	b.AssertRenderCountContent(3)
+func TestRebuildRenameTextFileInLeafBundle(t *testing.T) {
+	testRebuildBothWatchingAndRunning(t, rebuildFilesSimple, func(b *IntegrationTestBuilder) {
+		b.AssertFileContent("public/mysection/mysectionbundle/index.html", "My Section Bundle Text 2 Content.", "Len Resources: 2|")
+
+		b.RenameFile("content/mysection/mysectionbundle/mysectionbundletext.txt", "content/mysection/mysectionbundle/mysectionbundletext2.txt").Build()
+		b.AssertFileContent("public/mysection/mysectionbundle/index.html", "mysectionbundletext2", "My Section Bundle Text 2 Content.", "Len Resources: 2|")
+		b.AssertRenderCountPage(5)
+		b.AssertRenderCountContent(6)
+	})
 }
 
 func TestRebuilEditContentFileInLeafBundle(t *testing.T) {
@@ -135,6 +150,19 @@ func TestRebuilEditContentFileInLeafBundle(t *testing.T) {
 	b.AssertFileContent("public/mysection/mysectionbundle/index.html", "My Section Bundle Content Content.")
 	b.EditFileReplaceAll("content/mysection/mysectionbundle/mysectionbundlecontent.md", "Content Content.", "Content Content Edited.").Build()
 	b.AssertFileContent("public/mysection/mysectionbundle/index.html", "My Section Bundle Content Content Edited.")
+}
+
+func TestRebuilEditContentFileThenAnother(t *testing.T) {
+	b := TestRunning(t, rebuildFilesSimple)
+	b.EditFileReplaceAll("content/mysection/mysectionbundle/mysectionbundlecontent.md", "Content Content.", "Content Content Edited.").Build()
+	b.AssertFileContent("public/mysection/mysectionbundle/index.html", "My Section Bundle Content Content Edited.")
+	b.AssertRenderCountPage(1)
+	b.AssertRenderCountContent(2)
+
+	b.EditFileReplaceAll("content/myothersection/myothersectionpage.md", "myothersectionpage Content.", "myothersectionpage Content Edited.").Build()
+	b.AssertFileContent("public/myothersection/myothersectionpage/index.html", "myothersectionpage Content Edited")
+	b.AssertRenderCountPage(1)
+	b.AssertRenderCountContent(1)
 }
 
 func TestRebuildRenameTextFileInBranchBundle(t *testing.T) {
@@ -153,7 +181,7 @@ func TestRebuildRenameTextFileInHomeBundle(t *testing.T) {
 
 	b.RenameFile("content/hometext.txt", "content/hometext2.txt").Build()
 	b.AssertFileContent("public/index.html", "hometext2", "Home Text Content.")
-	b.AssertRenderCountPage(2)
+	b.AssertRenderCountPage(3)
 }
 
 func TestRebuildRenameDirectoryWithLeafBundle(t *testing.T) {
@@ -169,7 +197,7 @@ func TestRebuildRenameDirectoryWithBranchBundle(t *testing.T) {
 	b.AssertFileContent("public/mysectionrenamed/index.html", "My Section")
 	b.AssertFileContent("public/mysectionrenamed/mysectionbundle/index.html", "My Section Bundle")
 	b.AssertFileContent("public/mysectionrenamed/mysectionbundle/mysectionbundletext.txt", "My Section Bundle Text 2 Content.")
-	b.AssertRenderCountPage(2)
+	b.AssertRenderCountPage(3)
 }
 
 func TestRebuildRenameDirectoryWithRegularPageUsedInHome(t *testing.T) {
@@ -268,7 +296,7 @@ func TestRebuildRenameDirectoryWithBranchBundleFastRender(t *testing.T) {
 	b.AssertFileContent("public/mysectionrenamed/index.html", "My Section")
 	b.AssertFileContent("public/mysectionrenamed/mysectionbundle/index.html", "My Section Bundle")
 	b.AssertFileContent("public/mysectionrenamed/mysectionbundle/mysectionbundletext.txt", "My Section Bundle Text 2 Content.")
-	b.AssertRenderCountPage(2)
+	b.AssertRenderCountPage(3)
 }
 
 func TestRebuilErrorRecovery(t *testing.T) {
@@ -366,8 +394,6 @@ My short.
 }
 
 func TestRebuildBaseof(t *testing.T) {
-	t.Parallel()
-
 	files := `
 -- hugo.toml --
 title = "Hugo Site"
@@ -382,12 +408,13 @@ Baseof: {{ .Title }}|
 Home: {{ .Title }}|{{ .Content }}|
 {{ end }}
 `
-	b := Test(t, files, TestOptRunning())
-	b.AssertFileContent("public/index.html", "Baseof: Hugo Site|", "Home: Hugo Site||")
-	b.EditFileReplaceFunc("layouts/_default/baseof.html", func(s string) string {
-		return strings.Replace(s, "Baseof", "Baseof Edited", 1)
-	}).Build()
-	b.AssertFileContent("public/index.html", "Baseof Edited: Hugo Site|", "Home: Hugo Site||")
+	testRebuildBothWatchingAndRunning(t, files, func(b *IntegrationTestBuilder) {
+		b.AssertFileContent("public/index.html", "Baseof: Hugo Site|", "Home: Hugo Site||")
+		b.EditFileReplaceFunc("layouts/_default/baseof.html", func(s string) string {
+			return strings.Replace(s, "Baseof", "Baseof Edited", 1)
+		}).Build()
+		b.AssertFileContent("public/index.html", "Baseof Edited: Hugo Site|", "Home: Hugo Site||")
+	})
 }
 
 func TestRebuildSingleWithBaseof(t *testing.T) {
@@ -1489,4 +1516,128 @@ title: "Default"
 	b := TestRunning(t, files)
 	// Just make sure that it doesn't panic.
 	b.EditFileReplaceAll("archetypes/default.md", "Default", "Default Edited").Build()
+}
+
+func TestRebuildEditMixedCaseTemplateFileIssue12165(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+baseURL = "https://example.com"
+disableLiveReload = true
+-- layouts/partials/MyTemplate.html --
+MyTemplate
+-- layouts/index.html --
+MyTemplate: {{ partial "MyTemplate.html" . }}|
+
+
+`
+
+	b := TestRunning(t, files)
+
+	b.AssertFileContent("public/index.html", "MyTemplate: MyTemplate")
+
+	b.EditFileReplaceAll("layouts/partials/MyTemplate.html", "MyTemplate", "MyTemplate Edited").Build()
+
+	b.AssertFileContent("public/index.html", "MyTemplate: MyTemplate Edited")
+}
+
+func TestRebuildEditAsciidocContentFile(t *testing.T) {
+	if !asciidocext.Supports() {
+		t.Skip("skip asciidoc")
+	}
+	files := `
+-- hugo.toml --
+baseURL = "https://example.com"
+disableLiveReload = true
+disableKinds = ["taxonomy", "term", "sitemap", "robotsTXT", "404", "rss", "home", "section"]
+[security]
+[security.exec]
+allow = ['^python$', '^rst2html.*', '^asciidoctor$']
+-- content/posts/p1.adoc --
+---
+title: "P1"
+---
+P1 Content.
+-- content/posts/p2.adoc --
+---
+title: "P2"
+---
+P2 Content.
+-- layouts/_default/single.html --
+Single: {{ .Title }}|{{ .Content }}|
+`
+	b := TestRunning(t, files)
+	b.AssertFileContent("public/posts/p1/index.html",
+		"Single: P1|<div class=\"paragraph\">\n<p>P1 Content.</p>\n</div>\n|")
+	b.AssertRenderCountPage(2)
+	b.AssertRenderCountContent(2)
+
+	b.EditFileReplaceAll("content/posts/p1.adoc", "P1 Content.", "P1 Content Edited.").Build()
+
+	b.AssertFileContent("public/posts/p1/index.html", "Single: P1|<div class=\"paragraph\">\n<p>P1 Content Edited.</p>\n</div>\n|")
+	b.AssertRenderCountPage(1)
+	b.AssertRenderCountContent(1)
+}
+
+func TestRebuildEditSingleListChangeUbuntuIssue12362(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['rss','section','sitemap','taxonomy','term']
+disableLiveReload = true
+-- layouts/_default/list.html --
+{{ range .Pages }}{{ .Title }}|{{ end }}
+-- layouts/_default/single.html --
+{{ .Title }}
+-- content/p1.md --
+---
+title: p1
+---
+`
+
+	b := TestRunning(t, files)
+	b.AssertFileContent("public/index.html", "p1|")
+
+	b.AddFiles("content/p2.md", "---\ntitle: p2\n---").Build()
+	b.AssertFileContent("public/index.html", "p1|p2|") // this test passes, which doesn't match reality
+}
+
+func TestRebuildHomeThenPageIssue12436(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+baseURL = "https://example.com"
+disableKinds = ['sitemap','taxonomy','term']
+disableLiveReload = true
+-- layouts/_default/list.html --
+{{ .Content }}
+-- layouts/_default/single.html --
+{{ .Content }}
+-- content/_index.md --
+---
+title: home
+---
+home-content|
+-- content/p1/index.md --
+---
+title: p1
+---
+p1-content|
+`
+
+	b := TestRunning(t, files)
+
+	b.AssertFileContent("public/index.html", "home-content|")
+	b.AssertFileContent("public/p1/index.html", "p1-content|")
+	b.AssertRenderCountPage(3)
+
+	b.EditFileReplaceAll("content/_index.md", "home-content", "home-content-foo").Build()
+	b.AssertFileContent("public/index.html", "home-content-foo")
+	b.AssertRenderCountPage(2) // Home page rss + html
+
+	b.EditFileReplaceAll("content/p1/index.md", "p1-content", "p1-content-foo").Build()
+	b.AssertFileContent("public/p1/index.html", "p1-content-foo")
 }

@@ -62,6 +62,7 @@ import (
 )
 
 func (s *Site) Taxonomies() page.TaxonomyList {
+	s.CheckReady()
 	s.init.taxonomies.Do(context.Background())
 	return s.taxonomies
 }
@@ -199,11 +200,8 @@ func (s *Site) prepareInits() {
 	})
 }
 
-type siteRenderingContext struct {
-	output.Format
-}
-
 func (s *Site) Menus() navigation.Menus {
+	s.CheckReady()
 	s.init.menus.Do(context.Background())
 	return s.menus
 }
@@ -369,27 +367,49 @@ func (s *Site) watching() bool {
 	return s.h != nil && s.h.Configs.Base.Internal.Watch
 }
 
-type whatChanged struct {
+type WhatChanged struct {
 	mu sync.Mutex
 
-	contentChanged bool
-	identitySet    identity.Identities
+	needsPagesAssembly bool
+	identitySet        identity.Identities
 }
 
-func (w *whatChanged) Add(ids ...identity.Identity) {
+func (w *WhatChanged) Add(ids ...identity.Identity) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	if w.identitySet == nil {
+		w.identitySet = make(identity.Identities)
+	}
 
 	for _, id := range ids {
 		w.identitySet[id] = true
 	}
 }
 
-func (w *whatChanged) Changes() []identity.Identity {
+func (w *WhatChanged) Clear() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.clear()
+}
+
+func (w *WhatChanged) clear() {
+	w.identitySet = identity.Identities{}
+}
+
+func (w *WhatChanged) Changes() []identity.Identity {
 	if w == nil || w.identitySet == nil {
 		return nil
 	}
 	return w.identitySet.AsSlice()
+}
+
+func (w *WhatChanged) Drain() []identity.Identity {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	ids := w.identitySet.AsSlice()
+	w.clear()
+	return ids
 }
 
 // RegisterMediaTypes will register the Site's media types in the mime
@@ -424,7 +444,35 @@ func (h *HugoSites) fileEventsFilter(events []fsnotify.Event) []fsnotify.Event {
 		events[n] = ev
 		n++
 	}
-	return events[:n]
+	events = events[:n]
+
+	eventOrdinal := func(e fsnotify.Event) int {
+		// Pull the structural changes to the top.
+		if e.Op.Has(fsnotify.Create) {
+			return 1
+		}
+		if e.Op.Has(fsnotify.Remove) {
+			return 2
+		}
+		if e.Op.Has(fsnotify.Rename) {
+			return 3
+		}
+		if e.Op.Has(fsnotify.Write) {
+			return 4
+		}
+		return 5
+	}
+
+	sort.Slice(events, func(i, j int) bool {
+		// First sort by event type.
+		if eventOrdinal(events[i]) != eventOrdinal(events[j]) {
+			return eventOrdinal(events[i]) < eventOrdinal(events[j])
+		}
+		// Then sort by name.
+		return events[i].Name < events[j].Name
+	})
+
+	return events
 }
 
 type fileEventInfo struct {
@@ -494,41 +542,17 @@ func (h *HugoSites) fileEventsApplyInfo(events []fsnotify.Event) []fileEventInfo
 	return infos
 }
 
-func (h *HugoSites) fileEventsTranslate(events []fsnotify.Event) []fsnotify.Event {
-	eventMap := make(map[string][]fsnotify.Event)
-
-	// We often get a Remove etc. followed by a Create, a Create followed by a Write.
-	// Remove the superfluous events to make the update logic simpler.
-	for _, ev := range events {
-		eventMap[ev.Name] = append(eventMap[ev.Name], ev)
-	}
-
+func (h *HugoSites) fileEventsTrim(events []fsnotify.Event) []fsnotify.Event {
+	seen := make(map[string]bool)
 	n := 0
 	for _, ev := range events {
-		mapped := eventMap[ev.Name]
-
-		// Keep one
-		found := false
-		var kept fsnotify.Event
-		for i, ev2 := range mapped {
-			if i == 0 {
-				kept = ev2
-			}
-
-			if ev2.Op&fsnotify.Write == fsnotify.Write {
-				kept = ev2
-				found = true
-			}
-
-			if !found && ev2.Op&fsnotify.Create == fsnotify.Create {
-				kept = ev2
-			}
+		if seen[ev.Name] {
+			continue
 		}
-
-		events[n] = kept
+		seen[ev.Name] = true
+		events[n] = ev
 		n++
 	}
-
 	return events
 }
 
@@ -655,11 +679,16 @@ func (s *Site) assembleMenus() error {
 
 	if sectionPagesMenu != "" {
 		if err := s.pageMap.forEachPage(pagePredicates.ShouldListGlobal, func(p *pageState) (bool, error) {
-			if p.IsHome() || !p.m.shouldBeCheckedForMenuDefinitions() {
+			if p.Kind() != kinds.KindSection || !p.m.shouldBeCheckedForMenuDefinitions() {
 				return false, nil
 			}
+
 			// The section pages menus are attached to the top level section.
 			id := p.Section()
+			if id == "" {
+				id = "/"
+			}
+
 			if _, ok := flat[twoD{sectionPagesMenu, id}]; ok {
 				return false, nil
 			}
@@ -671,6 +700,7 @@ func (s *Site) assembleMenus() error {
 				},
 				Page: p,
 			}
+
 			navigation.SetPageValues(&me, p)
 			flat[twoD{sectionPagesMenu, me.KeyName()}] = &me
 			return false, nil
@@ -678,6 +708,7 @@ func (s *Site) assembleMenus() error {
 			return err
 		}
 	}
+
 	// Add menu entries provided by pages
 	if err := s.pageMap.forEachPage(pagePredicates.ShouldListGlobal, func(p *pageState) (bool, error) {
 		for name, me := range p.pageMenus.menus() {
@@ -775,6 +806,7 @@ func (s *Site) errorCollator(results <-chan error, errs chan<- error) {
 // as possible for existing sites. Most sites will use {{ .Site.GetPage "section" "my/section" }},
 // i.e. 2 arguments, so we test for that.
 func (s *Site) GetPage(ref ...string) (page.Page, error) {
+	s.CheckReady()
 	p, err := s.s.getPageForRefs(ref...)
 
 	if p == nil {

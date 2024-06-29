@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -54,21 +55,31 @@ type pageContentReplacement struct {
 	source pageparser.Item
 }
 
-func (m *pageMeta) parseFrontMatter(h *HugoSites, pid uint64, sourceKey string) (*contentParseInfo, error) {
-	var openSource hugio.OpenReadSeekCloser
-	if m.f != nil {
-		meta := m.f.FileInfo().Meta()
-		openSource = func() (hugio.ReadSeekCloser, error) {
-			r, err := meta.Open()
-			if err != nil {
-				return nil, fmt.Errorf("failed to open file %q: %w", meta.Filename, err)
+func (m *pageMeta) parseFrontMatter(h *HugoSites, pid uint64) (*contentParseInfo, error) {
+	var (
+		sourceKey            string
+		openSource           hugio.OpenReadSeekCloser
+		isFromContentAdapter = m.pageConfig.IsFromContentAdapter
+	)
+
+	if m.f != nil && !isFromContentAdapter {
+		sourceKey = filepath.ToSlash(m.f.Filename())
+		if !isFromContentAdapter {
+			meta := m.f.FileInfo().Meta()
+			openSource = func() (hugio.ReadSeekCloser, error) {
+				r, err := meta.Open()
+				if err != nil {
+					return nil, fmt.Errorf("failed to open file %q: %w", meta.Filename, err)
+				}
+				return r, nil
 			}
-			return r, nil
 		}
+	} else if isFromContentAdapter {
+		openSource = m.pageConfig.Content.ValueAsOpenReadSeekCloser()
 	}
 
 	if sourceKey == "" {
-		sourceKey = strconv.Itoa(int(pid))
+		sourceKey = strconv.FormatUint(pid, 10)
 	}
 
 	pi := &contentParseInfo{
@@ -85,13 +96,20 @@ func (m *pageMeta) parseFrontMatter(h *HugoSites, pid uint64, sourceKey string) 
 
 	items, err := pageparser.ParseBytes(
 		source,
-		pageparser.Config{},
+		pageparser.Config{
+			NoFrontMatter: isFromContentAdapter,
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	pi.itemsStep1 = items
+
+	if isFromContentAdapter {
+		// No front matter.
+		return pi, nil
+	}
 
 	if err := pi.mapFrontMatter(source); err != nil {
 		return nil, err
@@ -418,6 +436,8 @@ func (c *cachedContent) mustSource() []byte {
 
 func (c *contentParseInfo) contentSource(s resource.StaleInfo) ([]byte, error) {
 	key := c.sourceKey
+	versionv := s.StaleVersion()
+
 	v, err := c.h.cacheContentSource.GetOrCreate(key, func(string) (*resources.StaleValue[[]byte], error) {
 		b, err := c.readSourceAll()
 		if err != nil {
@@ -426,8 +446,8 @@ func (c *contentParseInfo) contentSource(s resource.StaleInfo) ([]byte, error) {
 
 		return &resources.StaleValue[[]byte]{
 			Value: b,
-			IsStaleFunc: func() bool {
-				return s.IsStale()
+			StaleVersionFunc: func() uint32 {
+				return s.StaleVersion() - versionv
 			},
 		}, nil
 	})
@@ -487,7 +507,7 @@ type contentPlainPlainWords struct {
 func (c *cachedContent) contentRendered(ctx context.Context, cp *pageContentOutput) (contentSummary, error) {
 	ctx = tpl.Context.DependencyScope.Set(ctx, pageDependencyScopeGlobal)
 	key := c.pi.sourceKey + "/" + cp.po.f.Name
-	versionv := cp.contentRenderedVersion
+	versionv := c.version(cp)
 
 	v, err := c.pm.cacheContentRendered.GetOrCreate(key, func(string) (*resources.StaleValue[contentSummary], error) {
 		cp.po.p.s.Log.Trace(logg.StringFunc(func() string {
@@ -504,8 +524,8 @@ func (c *cachedContent) contentRendered(ctx context.Context, cp *pageContentOutp
 		}
 
 		rs := &resources.StaleValue[contentSummary]{
-			IsStaleFunc: func() bool {
-				return c.IsStale() || cp.contentRenderedVersion != versionv
+			StaleVersionFunc: func() uint32 {
+				return c.version(cp) - versionv
 			},
 		}
 
@@ -522,6 +542,7 @@ func (c *cachedContent) contentRendered(ctx context.Context, cp *pageContentOutp
 			if err != nil {
 				return nil, err
 			}
+
 			if !ok {
 				return nil, errors.New("invalid state: astDoc is set but RenderContent returned false")
 			}
@@ -564,15 +585,14 @@ func (c *cachedContent) contentRendered(ctx context.Context, cp *pageContentOutp
 		var result contentSummary // hasVariants bool
 
 		if c.pi.hasSummaryDivider {
-			isHTML := cp.po.p.m.pageConfig.Markup == "html"
-			if isHTML {
+			if cp.po.p.m.pageConfig.ContentMediaType.IsHTML() {
 				// Use the summary sections as provided by the user.
 				i := bytes.Index(b, internalSummaryDividerPre)
 				result.summary = helpers.BytesToHTML(b[:i])
 				b = b[i+len(internalSummaryDividerPre):]
 
 			} else {
-				summary, content, err := splitUserDefinedSummaryAndContent(cp.po.p.m.pageConfig.Markup, b)
+				summary, content, err := splitUserDefinedSummaryAndContent(cp.po.p.m.pageConfig.Content.Markup, b)
 				if err != nil {
 					cp.po.p.s.Log.Errorf("Failed to set user defined summary for page %q: %s", cp.po.p.pathOrTitle(), err)
 				} else {
@@ -606,7 +626,7 @@ var setGetContentCallbackInContext = hcontext.NewContextDispatcher[func(*pageCon
 
 func (c *cachedContent) contentToC(ctx context.Context, cp *pageContentOutput) (contentTableOfContents, error) {
 	key := c.pi.sourceKey + "/" + cp.po.f.Name
-	versionv := cp.contentRenderedVersion
+	versionv := c.version(cp)
 
 	v, err := c.pm.contentTableOfContents.GetOrCreate(key, func(string) (*resources.StaleValue[contentTableOfContents], error) {
 		source, err := c.pi.contentSource(c)
@@ -626,8 +646,10 @@ func (c *cachedContent) contentToC(ctx context.Context, cp *pageContentOutput) (
 			return nil, err
 		}
 
-		// Callback called from above (e.g. in .RenderString)
+		// Callback called from below (e.g. in .RenderString)
 		ctxCallback := func(cp2 *pageContentOutput, ct2 contentTableOfContents) {
+			cp.otherOutputs[cp2.po.p.pid] = cp2
+
 			// Merge content placeholders
 			for k, v := range ct2.contentPlaceholders {
 				ct.contentPlaceholders[k] = v
@@ -660,7 +682,7 @@ func (c *cachedContent) contentToC(ctx context.Context, cp *pageContentOutput) (
 			p.pageOutputTemplateVariationsState.Add(1)
 		}
 
-		isHTML := cp.po.p.m.pageConfig.Markup == "html"
+		isHTML := cp.po.p.m.pageConfig.ContentMediaType.IsHTML()
 
 		if !isHTML {
 			createAndSetToC := func(tocProvider converter.TableOfContentsProvider) {
@@ -710,8 +732,8 @@ func (c *cachedContent) contentToC(ctx context.Context, cp *pageContentOutput) (
 
 		return &resources.StaleValue[contentTableOfContents]{
 			Value: ct,
-			IsStaleFunc: func() bool {
-				return c.IsStale() || cp.contentRenderedVersion != versionv
+			StaleVersionFunc: func() uint32 {
+				return c.version(cp) - versionv
 			},
 		}, nil
 	})
@@ -722,16 +744,21 @@ func (c *cachedContent) contentToC(ctx context.Context, cp *pageContentOutput) (
 	return v.Value, nil
 }
 
+func (c *cachedContent) version(cp *pageContentOutput) uint32 {
+	// Both of these gets incremented on change.
+	return c.StaleVersion() + cp.contentRenderedVersion
+}
+
 func (c *cachedContent) contentPlain(ctx context.Context, cp *pageContentOutput) (contentPlainPlainWords, error) {
 	key := c.pi.sourceKey + "/" + cp.po.f.Name
 
-	versionv := cp.contentRenderedVersion
+	versionv := c.version(cp)
 
 	v, err := c.pm.cacheContentPlain.GetOrCreateWitTimeout(key, cp.po.p.s.Conf.Timeout(), func(string) (*resources.StaleValue[contentPlainPlainWords], error) {
 		var result contentPlainPlainWords
 		rs := &resources.StaleValue[contentPlainPlainWords]{
-			IsStaleFunc: func() bool {
-				return c.IsStale() || cp.contentRenderedVersion != versionv
+			StaleVersionFunc: func() uint32 {
+				return c.version(cp) - versionv
 			},
 		}
 
@@ -770,7 +797,7 @@ func (c *cachedContent) contentPlain(ctx context.Context, cp *pageContentOutput)
 			result.readingTime = (result.wordCount + 212) / 213
 		}
 
-		if rendered.summary != "" {
+		if c.pi.hasSummaryDivider || rendered.summary != "" {
 			result.summary = rendered.summary
 			result.summaryTruncated = rendered.summaryTruncated
 		} else if cp.po.p.m.pageConfig.Summary != "" {
@@ -778,7 +805,7 @@ func (c *cachedContent) contentPlain(ctx context.Context, cp *pageContentOutput)
 			if err != nil {
 				return nil, err
 			}
-			html := cp.po.p.s.ContentSpec.TrimShortHTML(b.Bytes())
+			html := cp.po.p.s.ContentSpec.TrimShortHTML(b.Bytes(), cp.po.p.m.pageConfig.Content.Markup)
 			result.summary = helpers.BytesToHTML(html)
 		} else {
 			var summary string

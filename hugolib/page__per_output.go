@@ -25,11 +25,14 @@ import (
 	"github.com/gohugoio/hugo/common/text"
 	"github.com/gohugoio/hugo/common/types/hstring"
 	"github.com/gohugoio/hugo/identity"
+	"github.com/gohugoio/hugo/markup"
+	"github.com/gohugoio/hugo/media"
 	"github.com/gohugoio/hugo/parser/pageparser"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"
 
 	"github.com/gohugoio/hugo/markup/converter/hooks"
+	"github.com/gohugoio/hugo/markup/goldmark/hugocontext"
 	"github.com/gohugoio/hugo/markup/highlight/chromalexers"
 	"github.com/gohugoio/hugo/markup/tableofcontents"
 
@@ -68,8 +71,9 @@ var (
 
 func newPageContentOutput(po *pageOutput) (*pageContentOutput, error) {
 	cp := &pageContentOutput{
-		po:          po,
-		renderHooks: &renderHooks{},
+		po:           po,
+		renderHooks:  &renderHooks{},
+		otherOutputs: make(map[uint64]*pageContentOutput),
 	}
 	return cp, nil
 }
@@ -83,8 +87,12 @@ type renderHooks struct {
 type pageContentOutput struct {
 	po *pageOutput
 
-	contentRenderedVersion int  // Incremented on reset.
-	contentRendered        bool // Set on content render.
+	// Other pages involved in rendering of this page,
+	// typically included with .RenderShortcodes.
+	otherOutputs map[uint64]*pageContentOutput
+
+	contentRenderedVersion uint32 // Incremented on reset.
+	contentRendered        bool   // Set on content render.
 
 	// Renders Markdown hooks.
 	renderHooks *renderHooks
@@ -163,6 +171,13 @@ func (pco *pageContentOutput) RenderShortcodes(ctx context.Context) (template.HT
 
 	if cb != nil {
 		cb(pco, ct)
+	}
+
+	if tpl.Context.IsInGoldmark.Get(ctx) {
+		// This content will be parsed and rendered by Goldmark.
+		// Wrap it in a special Hugo markup to assign the correct Page from
+		// the stack.
+		return template.HTML(hugocontext.Wrap(c, pco.po.p.pid)), nil
 	}
 
 	return helpers.BytesToHTML(c), nil
@@ -249,6 +264,9 @@ func (pco *pageContentOutput) RenderString(ctx context.Context, args ...any) (te
 		if err := mapstructure.WeakDecode(m, &opts); err != nil {
 			return "", fmt.Errorf("failed to decode options: %w", err)
 		}
+		if opts.Markup != "" {
+			opts.Markup = markup.ResolveMarkup(opts.Markup)
+		}
 	}
 
 	contentToRenderv := args[sidx]
@@ -270,7 +288,8 @@ func (pco *pageContentOutput) RenderString(ctx context.Context, args ...any) (te
 	}
 
 	conv := pco.po.p.getContentConverter()
-	if opts.Markup != "" && opts.Markup != pco.po.p.m.pageConfig.Markup {
+
+	if opts.Markup != "" && opts.Markup != pco.po.p.m.pageConfig.ContentMediaType.SubType {
 		var err error
 		conv, err = pco.po.p.m.newContentConverter(pco.po.p, opts.Markup)
 		if err != nil {
@@ -288,7 +307,10 @@ func (pco *pageContentOutput) RenderString(ctx context.Context, args ...any) (te
 	if pageparser.HasShortcode(contentToRender) {
 		contentToRenderb := []byte(contentToRender)
 		// String contains a shortcode.
-		parseInfo.itemsStep1, err = pageparser.ParseBytesMain(contentToRenderb, pageparser.Config{})
+		parseInfo.itemsStep1, err = pageparser.ParseBytes(contentToRenderb, pageparser.Config{
+			NoFrontMatter:    true,
+			NoSummaryDivider: true,
+		})
 		if err != nil {
 			return "", err
 		}
@@ -363,9 +385,11 @@ func (pco *pageContentOutput) RenderString(ctx context.Context, args ...any) (te
 	}
 
 	if opts.Display == "inline" {
-		// We may have to rethink this in the future when we get other
-		// renderers.
-		rendered = pco.po.p.s.ContentSpec.TrimShortHTML(rendered)
+		markup := pco.po.p.m.pageConfig.Content.Markup
+		if opts.Markup != "" {
+			markup = pco.po.p.s.ContentSpec.ResolveMarkup(opts.Markup)
+		}
+		rendered = pco.po.p.s.ContentSpec.TrimShortHTML(rendered, markup)
 	}
 
 	return template.HTML(string(rendered)), nil
@@ -642,7 +666,7 @@ func splitUserDefinedSummaryAndContent(markup string, c []byte) (summary []byte,
 
 	startTag := "p"
 	switch markup {
-	case "asciidocext":
+	case media.DefaultContentTypes.AsciiDoc.SubType:
 		startTag = "div"
 	}
 

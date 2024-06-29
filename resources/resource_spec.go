@@ -14,6 +14,7 @@
 package resources
 
 import (
+	"fmt"
 	"path"
 	"sync"
 
@@ -22,11 +23,13 @@ import (
 	"github.com/gohugoio/hugo/output"
 	"github.com/gohugoio/hugo/resources/internal"
 	"github.com/gohugoio/hugo/resources/jsconfig"
+	"github.com/gohugoio/hugo/resources/page/pagemeta"
 
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/hexec"
 	"github.com/gohugoio/hugo/common/loggers"
 	"github.com/gohugoio/hugo/common/paths"
+	"github.com/gohugoio/hugo/common/types"
 
 	"github.com/gohugoio/hugo/identity"
 
@@ -51,6 +54,8 @@ func NewSpec(
 	logger loggers.Logger,
 	errorHandler herrors.ErrorSender,
 	execHelper *hexec.Exec,
+	buildClosers types.CloseAdder,
+	rebuilder identity.SignalRebuilder,
 ) (*Spec, error) {
 	conf := s.Cfg.GetConfig().(*allconfig.Config)
 	imgConfig := conf.Imaging
@@ -85,10 +90,12 @@ func NewSpec(
 	}
 
 	rs := &Spec{
-		PathSpec:    s,
-		Logger:      logger,
-		ErrorSender: errorHandler,
-		imaging:     imaging,
+		PathSpec:     s,
+		Logger:       logger,
+		ErrorSender:  errorHandler,
+		BuildClosers: buildClosers,
+		Rebuilder:    rebuilder,
+		imaging:      imaging,
 		ImageCache: newImageCache(
 			fileCaches.ImageCache(),
 			memCache,
@@ -109,8 +116,10 @@ func NewSpec(
 type Spec struct {
 	*helpers.PathSpec
 
-	Logger      loggers.Logger
-	ErrorSender herrors.ErrorSender
+	Logger       loggers.Logger
+	ErrorSender  herrors.ErrorSender
+	BuildClosers types.CloseAdder
+	Rebuilder    identity.SignalRebuilder
 
 	TextTemplates tpl.TemplateParseFinder
 
@@ -143,6 +152,16 @@ type PostBuildAssets struct {
 	JSConfigBuilder      *jsconfig.Builder
 }
 
+func (r *Spec) NewResourceWrapperFromResourceConfig(rc *pagemeta.ResourceConfig) (resource.Resource, error) {
+	content := rc.Content
+	switch r := content.Value.(type) {
+	case resource.Resource:
+		return cloneWithMetadataFromResourceConfigIfNeeded(rc, r), nil
+	default:
+		return nil, fmt.Errorf("failed to create resource for path %q, expected a resource.Resource, got %T", rc.PathInfo.Path(), content.Value)
+	}
+}
+
 // NewResource creates a new Resource from the given ResourceSourceDescriptor.
 func (r *Spec) NewResource(rd ResourceSourceDescriptor) (resource.Resource, error) {
 	if err := rd.init(r); err != nil {
@@ -169,9 +188,9 @@ func (r *Spec) NewResource(rd ResourceSourceDescriptor) (resource.Resource, erro
 		paths:       rp,
 		spec:        r,
 		sd:          rd,
-		params:      make(map[string]any),
+		params:      rd.Params,
 		name:        rd.NameOriginal,
-		title:       rd.NameOriginal,
+		title:       rd.Title,
 	}
 
 	if rd.MediaType.MainType == "image" {

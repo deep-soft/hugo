@@ -636,3 +636,77 @@ Menu Item: {{ $i }}|{{ .URL }}|
 Menu Item: 0|/foo/posts|
 `)
 }
+
+func TestSectionPagesMenuMultilingualWarningIssue12306(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['section','rss','sitemap','taxonomy','term']
+defaultContentLanguageInSubdir = true
+sectionPagesMenu = "main"
+[languages.en]
+[languages.fr]
+-- layouts/_default/home.html --
+{{- range site.Menus.main -}}
+  <a href="{{ .URL }}">{{ .Name }}</a>
+{{- end -}}
+-- layouts/_default/single.html --
+{{ .Title }}
+-- content/p1.en.md --
+---
+title: p1
+menu: main
+---
+-- content/p1.fr.md --
+---
+title: p1
+menu: main
+---
+-- content/p2.en.md --
+---
+title: p2
+menu: main
+---
+`
+
+	b := Test(t, files, TestOptWarn())
+
+	b.AssertFileContent("public/en/index.html", `<a href="/en/p1/">p1</a><a href="/en/p2/">p2</a>`)
+	b.AssertFileContent("public/fr/index.html", `<a href="/fr/p1/">p1</a>`)
+	b.AssertLogContains("! WARN")
+}
+
+func TestSectionPagesIssue12399(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['rss','sitemap','taxonomy','term']
+capitalizeListTitles = false
+pluralizeListTitles = false
+sectionPagesMenu = 'main'
+-- content/p1.md --
+---
+title: p1
+---
+-- content/s1/p2.md --
+---
+title: p2
+menus: main
+---
+-- content/s1/p3.md --
+---
+title: p3
+---
+-- layouts/_default/list.html --
+{{ range site.Menus.main }}<a href="{{ .URL }}">{{ .Name }}</a>{{ end }}
+-- layouts/_default/single.html --
+{{ .Title }}
+`
+
+	b := Test(t, files)
+
+	b.AssertFileExists("public/index.html", true)
+	b.AssertFileContent("public/index.html", `<a href="/s1/p2/">p2</a><a href="/s1/">s1</a>`)
+}

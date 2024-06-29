@@ -926,6 +926,20 @@ chroma:
     - zig
     Name: Zig
 config:
+  HTTPCache:
+    cache:
+      for:
+        excludes:
+        - '**'
+        includes: null
+    polls:
+    - disable: true
+      for:
+        excludes: null
+        includes:
+        - '**'
+      high: 0s
+      low: 0s
   archeTypeDir: archetypes
   assetDir: assets
   author: {}
@@ -939,7 +953,6 @@ config:
     cacheBusters:
     - source: (postcss|tailwind)\.config\.js
       target: (css|styles|scss|sass)
-    duplicateResourceFiles: false
     noJSConfigInAssets: false
     useResourceCacheWhen: fallback
   buildDrafts: false
@@ -1065,6 +1078,15 @@ config:
           enable: false
           escapedSpace: false
         definitionList: true
+        extras:
+          insert:
+            enable: false
+          mark:
+            enable: false
+          subscript:
+            enable: false
+          superscript:
+            enable: false
         footnote: true
         linkify: true
         linkifyProtocol: https
@@ -1200,6 +1222,12 @@ config:
       delimiter: .
       suffixes:
       - webp
+    text/asciidoc:
+      delimiter: .
+      suffixes:
+      - adoc
+      - asciidoc
+      - ad
     text/calendar:
       delimiter: .
       suffixes:
@@ -1216,6 +1244,7 @@ config:
       delimiter: .
       suffixes:
       - html
+      - htm
     text/javascript:
       delimiter: .
       suffixes:
@@ -1230,11 +1259,25 @@ config:
       delimiter: .
       suffixes:
       - md
+      - mdown
       - markdown
+    text/org:
+      delimiter: .
+      suffixes:
+      - org
+    text/pandoc:
+      delimiter: .
+      suffixes:
+      - pandoc
+      - pdc
     text/plain:
       delimiter: .
       suffixes:
       - txt
+    text/rst:
+      delimiter: .
+      suffixes:
+      - rst
     text/tsx:
       delimiter: .
       suffixes:
@@ -1557,10 +1600,8 @@ config:
     disqus:
       disable: false
     googleAnalytics:
-      anonymizeIP: false
       disable: false
       respectDoNotTrack: false
-      useSessionStorage: false
     instagram:
       disable: false
       simple: false
@@ -1651,6 +1692,7 @@ config:
       disableInlineCSS: false
   sitemap:
     changeFreq: ""
+    disable: false
     filename: sitemap.xml
     priority: -1
   social: null
@@ -1692,6 +1734,8 @@ config_helpers:
     deployment:
       _merge: none
     frontmatter:
+      _merge: none
+    httpcache:
       _merge: none
     imaging:
       _merge: none
@@ -2799,8 +2843,8 @@ tpl:
             {{ $m.Set "Hugo" "Rocks!" }}
             {{ $m.Values | debug.Dump | safeHTML }}
           - |-
-            map[string]interface {}{
-              "Hugo": "Rocks!",
+            {
+              "Hugo": "Rocks!"
             }
       TestDeprecationErr:
         Aliases: null
@@ -4018,6 +4062,11 @@ tpl:
         - s
         Description: CountWords returns the approximate word count in s.
         Examples: []
+      Diff:
+        Aliases: null
+        Args: null
+        Description: ""
+        Examples: null
       FindRE:
         Aliases:
         - findRE
@@ -4582,5 +4631,5 @@ tpl:
         - urlize
         Args:
         - s
-        Description: URLize returns the the strings s formatted as an URL.
+        Description: URLize returns the strings s formatted as an URL.
         Examples: []

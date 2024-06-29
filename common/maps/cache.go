@@ -27,7 +27,12 @@ func NewCache[K comparable, T any]() *Cache[K, T] {
 }
 
 // Delete deletes the given key from the cache.
+// If c is nil, this method is a no-op.
 func (c *Cache[K, T]) Get(key K) (T, bool) {
+	if c == nil {
+		var zero T
+		return zero, false
+	}
 	c.RLock()
 	v, found := c.m[key]
 	c.RUnlock()
@@ -57,6 +62,35 @@ func (c *Cache[K, T]) GetOrCreate(key K, create func() T) T {
 func (c *Cache[K, T]) Set(key K, value T) {
 	c.Lock()
 	c.m[key] = value
+	c.Unlock()
+}
+
+// ForEeach calls the given function for each key/value pair in the cache.
+func (c *Cache[K, T]) ForEeach(f func(K, T)) {
+	c.RLock()
+	defer c.RUnlock()
+	for k, v := range c.m {
+		f(k, v)
+	}
+}
+
+func (c *Cache[K, T]) Drain() map[K]T {
+	c.Lock()
+	m := c.m
+	c.m = make(map[K]T)
+	c.Unlock()
+	return m
+}
+
+func (c *Cache[K, T]) Len() int {
+	c.RLock()
+	defer c.RUnlock()
+	return len(c.m)
+}
+
+func (c *Cache[K, T]) Reset() {
+	c.Lock()
+	c.m = make(map[K]T)
 	c.Unlock()
 }
 

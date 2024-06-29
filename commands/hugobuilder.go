@@ -43,6 +43,7 @@ import (
 	"github.com/gohugoio/hugo/hugofs"
 	"github.com/gohugoio/hugo/hugolib"
 	"github.com/gohugoio/hugo/hugolib/filesystems"
+	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/livereload"
 	"github.com/gohugoio/hugo/resources/page"
 	"github.com/gohugoio/hugo/watcher"
@@ -75,9 +76,14 @@ type hugoBuilder struct {
 	errState hugoBuilderErrState
 }
 
+var errConfigNotSet = errors.New("config not set")
+
 func (c *hugoBuilder) withConfE(fn func(conf *commonConfig) error) error {
 	c.confmu.Lock()
 	defer c.confmu.Unlock()
+	if c.conf == nil {
+		return errConfigNotSet
+	}
 	return fn(c.conf)
 }
 
@@ -338,6 +344,27 @@ func (c *hugoBuilder) newWatcher(pollIntervalStr string, dirList ...string) (*wa
 	go func() {
 		for {
 			select {
+			case changes := <-c.r.changesFromBuild:
+				c.errState.setBuildErr(nil)
+				unlock, err := h.LockBuild()
+				if err != nil {
+					c.r.logger.Errorln("Failed to acquire a build lock: %s", err)
+					return
+				}
+				c.changeDetector.PrepareNew()
+				err = c.rebuildSitesForChanges(changes)
+				if err != nil {
+					c.r.logger.Errorln("Error while watching:", err)
+				}
+				if c.s != nil && c.s.doLiveReload {
+					doReload := c.changeDetector == nil || len(c.changeDetector.changed()) > 0
+					doReload = doReload || c.showErrorInBrowser && c.errCount() > 0
+					if doReload {
+						livereload.ForceRefresh()
+					}
+				}
+				unlock()
+
 			case evs := <-watcher.Events:
 				unlock, err := h.LockBuild()
 				if err != nil {
@@ -585,7 +612,7 @@ func (c *hugoBuilder) fullRebuild(changeType string) {
 			time.Sleep(2 * time.Second)
 		}()
 
-		defer c.r.timeTrack(time.Now(), "Rebuilt")
+		defer c.postBuild("Rebuilt", time.Now())
 
 		err := c.reloadConfig()
 		if err != nil {
@@ -849,13 +876,13 @@ func (c *hugoBuilder) handleEvents(watcher *watcher.Batcher,
 			h.BaseFs.SourceFilesystems,
 			dynamicEvents)
 
-		onePageName := pickOneWriteOrCreatePath(partitionedEvents.ContentEvents)
+		onePageName := pickOneWriteOrCreatePath(h.Conf.ContentTypes(), partitionedEvents.ContentEvents)
 
 		c.printChangeDetected("")
 		c.changeDetector.PrepareNew()
 
 		func() {
-			defer c.r.timeTrack(time.Now(), "Total")
+			defer c.postBuild("Total", time.Now())
 			if err := c.rebuildSites(dynamicEvents); err != nil {
 				c.handleBuildErr(err, "Rebuild failed")
 			}
@@ -876,6 +903,29 @@ func (c *hugoBuilder) handleEvents(watcher *watcher.Batcher,
 					livereload.RefreshPath(pathToRefresh)
 				} else {
 					livereload.ForceRefresh()
+					// See https://github.com/gohugoio/hugo/issues/12600.
+					// If this change set also contains one or more CSS files, we need to
+					// refresh these as well.
+					var cssChanges []string
+					var otherChanges []string
+
+					for _, ev := range changed {
+						if strings.HasSuffix(ev, ".css") {
+							cssChanges = append(cssChanges, ev)
+						} else {
+							otherChanges = append(otherChanges, ev)
+						}
+					}
+
+					if len(otherChanges) > 0 {
+						livereload.ForceRefresh()
+						// Allow some time for the live reload script to get reconnected.
+						time.Sleep(200 * time.Millisecond)
+					}
+
+					for _, ev := range cssChanges {
+						livereload.RefreshPath(h.PathSpec.RelURL(paths.ToSlashTrimLeading(ev), false))
+					}
 				}
 			}
 
@@ -899,6 +949,13 @@ func (c *hugoBuilder) handleEvents(watcher *watcher.Batcher,
 			}
 		}
 	}
+}
+
+func (c *hugoBuilder) postBuild(what string, start time.Time) {
+	if h, err := c.hugo(); err == nil && h.Conf.Running() {
+		h.LogServerAddresses()
+	}
+	c.r.timeTrack(start, what)
 }
 
 func (c *hugoBuilder) hugo() (*hugolib.HugoSites, error) {
@@ -1005,6 +1062,19 @@ func (c *hugoBuilder) rebuildSites(events []fsnotify.Event) error {
 	}
 
 	return h.Build(hugolib.BuildCfg{NoBuildLock: true, RecentlyVisited: c.visitedURLs, ErrRecovery: c.errState.wasErr()}, events...)
+}
+
+func (c *hugoBuilder) rebuildSitesForChanges(ids []identity.Identity) error {
+	c.errState.setBuildErr(nil)
+	h, err := c.hugo()
+	if err != nil {
+		return err
+	}
+	whatChanged := &hugolib.WhatChanged{}
+	whatChanged.Add(ids...)
+	err = h.Build(hugolib.BuildCfg{NoBuildLock: true, WhatChanged: whatChanged, RecentlyVisited: c.visitedURLs, ErrRecovery: c.errState.wasErr()})
+	c.errState.setBuildErr(err)
+	return err
 }
 
 func (c *hugoBuilder) reloadConfig() error {

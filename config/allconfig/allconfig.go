@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/gohugoio/hugo/cache/filecache"
+	"github.com/gohugoio/hugo/cache/httpcache"
 	"github.com/gohugoio/hugo/common/hugo"
 	"github.com/gohugoio/hugo/common/loggers"
 	"github.com/gohugoio/hugo/common/maps"
@@ -119,6 +120,10 @@ type Config struct {
 	// <docsmeta>{"identifiers": ["caches"] }</docsmeta>
 	Caches filecache.Configs `mapstructure:"-"`
 
+	// The httpcache configuration section contains HTTP-cache-related configuration options.
+	// <docsmeta>{"identifiers": ["httpcache"] }</docsmeta>
+	HTTPCache httpcache.Config `mapstructure:"-"`
+
 	// The markup configuration section contains markup-related configuration options.
 	// <docsmeta>{"identifiers": ["markup"] }</docsmeta>
 	Markup markup_config.Config `mapstructure:"-"`
@@ -173,6 +178,9 @@ type Config struct {
 
 	// Server configuration.
 	Server config.Server `mapstructure:"-"`
+
+	// Pagination configuration.
+	Pagination config.Pagination `mapstructure:"-"`
 
 	// Privacy configuration.
 	Privacy privacy.Config `mapstructure:"-"`
@@ -307,9 +315,13 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 		}
 	}
 
+	for i, s := range c.IgnoreLogs {
+		c.IgnoreLogs[i] = strings.ToLower(s)
+	}
+
 	ignoredLogIDs := make(map[string]bool)
 	for _, err := range c.IgnoreLogs {
-		ignoredLogIDs[strings.ToLower(err)] = true
+		ignoredLogIDs[err] = true
 	}
 
 	baseURL, err := urls.NewBaseURLFromString(c.BaseURL)
@@ -359,6 +371,22 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 		}
 	}
 
+	httpCache, err := c.HTTPCache.Compile()
+	if err != nil {
+		return err
+	}
+
+	// Legacy paginate values.
+	if c.Paginate != 0 {
+		hugo.Deprecate("site config key paginate", "Use paginator.pagerSize instead.", "v0.128.0")
+		c.Pagination.PagerSize = c.Paginate
+	}
+
+	if c.PaginatePath != "" {
+		hugo.Deprecate("site config key paginatePath", "Use paginator.path instead.", "v0.128.0")
+		c.Pagination.Path = c.PaginatePath
+	}
+
 	c.C = &ConfigCompiled{
 		Timeout:           timeout,
 		BaseURL:           baseURL,
@@ -367,12 +395,14 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 		DisabledLanguages: disabledLangs,
 		IgnoredLogs:       ignoredLogIDs,
 		KindOutputFormats: kindOutputFormats,
+		ContentTypes:      media.DefaultContentTypes.FromTypes(c.MediaTypes.Config),
 		CreateTitle:       helpers.GetTitleFunc(c.TitleCaseStyle),
 		IsUglyURLSection:  isUglyURL,
 		IgnoreFile:        ignoreFile,
 		SegmentFilter:     c.Segments.Config.Get(func(s string) { logger.Warnf("Render segment %q not found in configuration", s) }, c.RootConfig.RenderSegments...),
 		MainSections:      c.MainSections,
 		Clock:             clock,
+		HTTPCache:         httpCache,
 		transientErr:      transientErr,
 	}
 
@@ -400,7 +430,9 @@ type ConfigCompiled struct {
 	Timeout           time.Duration
 	BaseURL           urls.BaseURL
 	BaseURLLiveReload urls.BaseURL
+	ServerInterface   string
 	KindOutputFormats map[string]output.Formats
+	ContentTypes      media.ContentTypes
 	DisabledKinds     map[string]bool
 	DisabledLanguages map[string]bool
 	IgnoredLogs       map[string]bool
@@ -410,6 +442,7 @@ type ConfigCompiled struct {
 	SegmentFilter     segments.SegmentFilter
 	MainSections      []string
 	Clock             time.Time
+	HTTPCache         httpcache.ConfigCompiled
 
 	// This is set to the last transient error found during config compilation.
 	// With themes/modules we compute the configuration in multiple passes, and
@@ -434,9 +467,10 @@ func (c *ConfigCompiled) IsMainSectionsSet() bool {
 }
 
 // This is set after the config is compiled by the server command.
-func (c *ConfigCompiled) SetBaseURL(baseURL, baseURLLiveReload urls.BaseURL) {
+func (c *ConfigCompiled) SetServerInfo(baseURL, baseURLLiveReload urls.BaseURL, serverInterface string) {
 	c.BaseURL = baseURL
 	c.BaseURLLiveReload = baseURLLiveReload
+	c.ServerInterface = serverInterface
 }
 
 // RootConfig holds all the top-level configuration options in Hugo
@@ -541,9 +575,11 @@ type RootConfig struct {
 	HasCJKLanguage bool
 
 	// The default number of pages per page when paginating.
+	// Deprecated: Use the Pagination struct.
 	Paginate int
 
 	// The path to use when creating pagination URLs, e.g. "page" in /page/2/.
+	// Deprecated: Use the Pagination struct.
 	PaginatePath string
 
 	// Whether to pluralize default list titles.
@@ -757,7 +793,7 @@ func (c *Configs) Init() error {
 	c.Languages = languages
 	c.LanguagesDefaultFirst = languagesDefaultFirst
 
-	c.ContentPathParser = &paths.PathParser{LanguageIndex: languagesDefaultFirst.AsIndexSet(), IsLangDisabled: c.Base.IsLangDisabled}
+	c.ContentPathParser = &paths.PathParser{LanguageIndex: languagesDefaultFirst.AsIndexSet(), IsLangDisabled: c.Base.IsLangDisabled, IsContentExt: c.Base.C.ContentTypes.IsContentSuffix}
 
 	c.configLangs = make([]config.AllProvider, len(c.Languages))
 	for i, l := range c.LanguagesDefaultFirst {

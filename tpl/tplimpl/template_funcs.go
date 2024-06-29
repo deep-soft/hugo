@@ -71,7 +71,7 @@ var (
 )
 
 type templateExecHelper struct {
-	running    bool // whether we're in server mode.
+	watching   bool // whether we're in server/watch mode.
 	site       reflect.Value
 	siteParams reflect.Value
 	funcs      map[string]reflect.Value
@@ -95,7 +95,7 @@ func (t *templateExecHelper) GetFunc(ctx context.Context, tmpl texttemplate.Prep
 }
 
 func (t *templateExecHelper) Init(ctx context.Context, tmpl texttemplate.Preparer) {
-	if t.running {
+	if t.watching {
 		_, ok := tmpl.(identity.IdentityProvider)
 		if ok {
 			t.trackDependencies(ctx, tmpl, "", reflect.Value{})
@@ -129,7 +129,7 @@ func (t *templateExecHelper) GetMethod(ctx context.Context, tmpl texttemplate.Pr
 		name = "MainSections"
 	}
 
-	if t.running {
+	if t.watching {
 		ctx = t.trackDependencies(ctx, tmpl, name, receiver)
 	}
 
@@ -151,7 +151,7 @@ func (t *templateExecHelper) GetMethod(ctx context.Context, tmpl texttemplate.Pr
 }
 
 func (t *templateExecHelper) OnCalled(ctx context.Context, tmpl texttemplate.Preparer, name string, args []reflect.Value, result reflect.Value) {
-	if !t.running {
+	if !t.watching {
 		return
 	}
 
@@ -238,7 +238,7 @@ func newTemplateExecuter(d *deps.Deps) (texttemplate.Executer, map[string]reflec
 	}
 
 	exeHelper := &templateExecHelper{
-		running:    d.Conf.Running(),
+		watching:   d.Conf.Watching(),
 		funcs:      funcsv,
 		site:       reflect.ValueOf(d.Site),
 		siteParams: reflect.ValueOf(d.Site.Params()),
@@ -252,6 +252,9 @@ func newTemplateExecuter(d *deps.Deps) (texttemplate.Executer, map[string]reflec
 func createFuncMap(d *deps.Deps) map[string]any {
 	funcMap := template.FuncMap{}
 
+	nsMap := make(map[string]any)
+	var onCreated []func(namespaces map[string]any)
+
 	// Merge the namespace funcs
 	for _, nsf := range internal.TemplateFuncsNamespaceRegistry {
 		ns := nsf(d)
@@ -259,6 +262,11 @@ func createFuncMap(d *deps.Deps) map[string]any {
 			panic(ns.Name + " is a duplicate template func")
 		}
 		funcMap[ns.Name] = ns.Context
+		contextV, err := ns.Context(context.Background())
+		if err != nil {
+			panic(err)
+		}
+		nsMap[ns.Name] = contextV
 		for _, mm := range ns.MethodMappings {
 			for _, alias := range mm.Aliases {
 				if _, exists := funcMap[alias]; exists {
@@ -267,6 +275,14 @@ func createFuncMap(d *deps.Deps) map[string]any {
 				funcMap[alias] = mm.Method
 			}
 		}
+
+		if ns.OnCreated != nil {
+			onCreated = append(onCreated, ns.OnCreated)
+		}
+	}
+
+	for _, f := range onCreated {
+		f(nsMap)
 	}
 
 	if d.OverloadedTemplateFuncs != nil {

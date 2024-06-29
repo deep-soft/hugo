@@ -46,12 +46,12 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/hugo"
+
 	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/common/urls"
 	"github.com/gohugoio/hugo/config"
 	"github.com/gohugoio/hugo/helpers"
 	"github.com/gohugoio/hugo/hugofs"
-	"github.com/gohugoio/hugo/hugofs/files"
 	"github.com/gohugoio/hugo/hugolib"
 	"github.com/gohugoio/hugo/hugolib/filesystems"
 	"github.com/gohugoio/hugo/livereload"
@@ -123,6 +123,7 @@ func newServerCommand() *serverCommand {
 					return mclib.RunMain()
 				},
 				withc: func(cmd *cobra.Command, r *rootCommand) {
+					cmd.ValidArgsFunction = cobra.NoFileCompletions
 					cmd.Flags().BoolVar(&uninstall, "uninstall", false, "Uninstall the local CA (but do not delete it).")
 				},
 			},
@@ -236,9 +237,8 @@ func (f *fileServer) createEndpoint(i int) (*http.ServeMux, net.Listener, string
 	listener := f.c.serverPorts[i].ln
 	logger := f.c.r.logger
 
-	r.Printf("Environment: %q\n", f.c.hugoTry().Deps.Site.Hugo().Environment)
-
 	if i == 0 {
+		r.Printf("Environment: %q\n", f.c.hugoTry().Deps.Site.Hugo().Environment)
 		mainTarget := "disk"
 		if f.c.r.renderToMemory {
 			mainTarget = "memory"
@@ -307,7 +307,7 @@ func (f *fileServer) createEndpoint(i int) (*http.ServeMux, net.Listener, string
 			if redirect := serverConfig.MatchRedirect(requestURI); !redirect.IsZero() {
 				// fullName := filepath.Join(dir, filepath.FromSlash(path.Clean("/"+name)))
 				doRedirect := true
-				// This matches Netlify's behaviour and is needed for SPA behaviour.
+				// This matches Netlify's behavior and is needed for SPA behavior.
 				// See https://docs.netlify.com/routing/redirects/rewrites-proxies/
 				if !redirect.Force {
 					path := filepath.Clean(strings.TrimPrefix(requestURI, baseURL.Path()))
@@ -523,23 +523,25 @@ of a second, you will be able to save and see your changes nearly instantly.`
 	cmd.Aliases = []string{"serve"}
 
 	cmd.Flags().IntVarP(&c.serverPort, "port", "p", 1313, "port on which the server will listen")
+	_ = cmd.RegisterFlagCompletionFunc("port", cobra.NoFileCompletions)
 	cmd.Flags().IntVar(&c.liveReloadPort, "liveReloadPort", -1, "port for live reloading (i.e. 443 in HTTPS proxy situations)")
+	_ = cmd.RegisterFlagCompletionFunc("liveReloadPort", cobra.NoFileCompletions)
 	cmd.Flags().StringVarP(&c.serverInterface, "bind", "", "127.0.0.1", "interface to which the server will bind")
+	_ = cmd.RegisterFlagCompletionFunc("bind", cobra.NoFileCompletions)
 	cmd.Flags().StringVarP(&c.tlsCertFile, "tlsCertFile", "", "", "path to TLS certificate file")
+	_ = cmd.MarkFlagFilename("tlsCertFile", "pem")
 	cmd.Flags().StringVarP(&c.tlsKeyFile, "tlsKeyFile", "", "", "path to TLS key file")
+	_ = cmd.MarkFlagFilename("tlsKeyFile", "pem")
 	cmd.Flags().BoolVar(&c.tlsAuto, "tlsAuto", false, "generate and use locally-trusted certificates.")
 	cmd.Flags().BoolVar(&c.pprof, "pprof", false, "enable the pprof server (port 8080)")
 	cmd.Flags().BoolVarP(&c.serverWatch, "watch", "w", true, "watch filesystem for changes and recreate as needed")
 	cmd.Flags().BoolVar(&c.noHTTPCache, "noHTTPCache", false, "prevent HTTP caching")
 	cmd.Flags().BoolVarP(&c.serverAppend, "appendPort", "", true, "append port to baseURL")
 	cmd.Flags().BoolVar(&c.disableLiveReload, "disableLiveReload", false, "watch without enabling live browser reload on rebuild")
-	cmd.Flags().BoolVar(&c.navigateToChanged, "navigateToChanged", false, "navigate to changed content file on live browser reload")
+	cmd.Flags().BoolVarP(&c.navigateToChanged, "navigateToChanged", "N", false, "navigate to changed content file on live browser reload")
 	cmd.Flags().BoolVar(&c.renderStaticToDisk, "renderStaticToDisk", false, "serve static files from disk and dynamic files from memory")
 	cmd.Flags().BoolVar(&c.disableFastRender, "disableFastRender", false, "enables full re-renders on changes")
 	cmd.Flags().BoolVar(&c.disableBrowserError, "disableBrowserError", false, "do not show build errors in the browser")
-
-	cmd.Flags().SetAnnotation("tlsCertFile", cobra.BashCompSubdirsInDir, []string{})
-	cmd.Flags().SetAnnotation("tlsKeyFile", cobra.BashCompSubdirsInDir, []string{})
 
 	r := cd.Root.Command.(*rootCommand)
 	applyLocalFlagsBuild(cmd, r)
@@ -566,7 +568,7 @@ func (c *serverCommand) PreRun(cd, runner *simplecobra.Commandeer) error {
 				}
 			}
 
-			if err := c.setBaseURLsInConfig(); err != nil {
+			if err := c.setServerInfoInConfig(); err != nil {
 				return err
 			}
 
@@ -611,7 +613,7 @@ func (c *serverCommand) PreRun(cd, runner *simplecobra.Commandeer) error {
 	return nil
 }
 
-func (c *serverCommand) setBaseURLsInConfig() error {
+func (c *serverCommand) setServerInfoInConfig() error {
 	if len(c.serverPorts) == 0 {
 		panic("no server ports set")
 	}
@@ -638,7 +640,8 @@ func (c *serverCommand) setBaseURLsInConfig() error {
 			if c.liveReloadPort != -1 {
 				baseURLLiveReload, _ = baseURLLiveReload.WithPort(c.liveReloadPort)
 			}
-			langConfig.C.SetBaseURL(baseURL, baseURLLiveReload)
+			langConfig.C.SetServerInfo(baseURL, baseURLLiveReload, c.serverInterface)
+
 		}
 		return nil
 	})
@@ -1185,16 +1188,16 @@ func partitionDynamicEvents(sourceFs *filesystems.SourceFilesystems, events []fs
 	return
 }
 
-func pickOneWriteOrCreatePath(events []fsnotify.Event) string {
+func pickOneWriteOrCreatePath(contentTypes config.ContentTypesProvider, events []fsnotify.Event) string {
 	name := ""
 
 	for _, ev := range events {
 		if ev.Op&fsnotify.Write == fsnotify.Write || ev.Op&fsnotify.Create == fsnotify.Create {
-			if files.IsIndexContentFile(ev.Name) {
+			if contentTypes.IsIndexContentFile(ev.Name) {
 				return ev.Name
 			}
 
-			if files.IsContentFile(ev.Name) {
+			if contentTypes.IsContentFile(ev.Name) {
 				name = ev.Name
 			}
 

@@ -20,11 +20,13 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 
 	bp "github.com/gohugoio/hugo/bufferpool"
 	"github.com/gohugoio/hugo/common/hcontext"
 	"github.com/gohugoio/hugo/identity"
+	"github.com/gohugoio/hugo/langs"
 	"github.com/gohugoio/hugo/output/layouts"
 
 	"github.com/gohugoio/hugo/output"
@@ -65,10 +67,14 @@ type TemplateHandlers struct {
 	TxtTmpl TemplateParseFinder
 }
 
+type TemplateExecutor interface {
+	ExecuteWithContext(ctx context.Context, t Template, wr io.Writer, data any) error
+}
+
 // TemplateHandler finds and executes templates.
 type TemplateHandler interface {
 	TemplateFinder
-	ExecuteWithContext(ctx context.Context, t Template, wr io.Writer, data any) error
+	TemplateExecutor
 	LookupLayout(d layouts.LayoutDescriptor, f output.Format) (Template, bool, error)
 	HasTemplate(name string) bool
 	GetIdentity(name string) (identity.Identity, bool)
@@ -156,6 +162,11 @@ type TemplateFuncGetter interface {
 	GetFunc(name string) (reflect.Value, bool)
 }
 
+type RenderingContext struct {
+	Site       site
+	SiteOutIdx int
+}
+
 type contextKey string
 
 // Context manages values passed in the context to templates.
@@ -165,10 +176,12 @@ var Context = struct {
 	SetDependencyManagerInCurrentScope func(context.Context, identity.Manager) context.Context
 	DependencyScope                    hcontext.ContextDispatcher[int]
 	Page                               hcontext.ContextDispatcher[page]
+	IsInGoldmark                       hcontext.ContextDispatcher[bool]
 }{
 	DependencyManagerScopedProvider: hcontext.NewContextDispatcher[identity.DependencyManagerScopedProvider](contextKey("DependencyManagerScopedProvider")),
 	DependencyScope:                 hcontext.NewContextDispatcher[int](contextKey("DependencyScope")),
 	Page:                            hcontext.NewContextDispatcher[page](contextKey("Page")),
+	IsInGoldmark:                    hcontext.NewContextDispatcher[bool](contextKey("IsInGoldmark")),
 }
 
 func init() {
@@ -184,6 +197,15 @@ func init() {
 type page interface {
 	IsNode() bool
 }
+
+type site interface {
+	Language() *langs.Language
+}
+
+const (
+	HugoDeferredTemplatePrefix = "__hdeferred/"
+	HugoDeferredTemplateSuffix = "__d="
+)
 
 const hugoNewLinePlaceholder = "___hugonl_"
 
@@ -221,4 +243,14 @@ func StripHTML(s string) string {
 	}
 
 	return s
+}
+
+type DeferredExecution struct {
+	Mu           sync.Mutex
+	Ctx          context.Context
+	TemplateName string
+	Data         any
+
+	Executed bool
+	Result   string
 }
