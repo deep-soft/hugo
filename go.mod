@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.35.4
 	github.com/bep/clocks v0.5.0
 	github.com/bep/debounce v1.2.0
-	github.com/bep/gitmap v1.1.2
+	github.com/bep/gitmap v1.4.0
 	github.com/bep/goat v0.5.0
 	github.com/bep/godartsass v1.2.0
 	github.com/bep/godartsass/v2 v2.0.0
@@ -21,6 +21,7 @@ require (
 	github.com/bep/overlayfs v0.9.2
 	github.com/bep/simplecobra v0.4.0
 	github.com/bep/tmc v0.5.1
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/mxj/v2 v2.7.0
 	github.com/cli/safeexec v1.0.1
 	github.com/disintegration/gift v1.2.1
@@ -66,19 +67,19 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/fsync v0.10.1
 	github.com/spf13/pflag v1.0.5
-	github.com/tdewolff/minify/v2 v2.20.20
-	github.com/tdewolff/parse/v2 v2.7.13
+	github.com/tdewolff/minify/v2 v2.20.36
+	github.com/tdewolff/parse/v2 v2.7.15
 	github.com/yuin/goldmark v1.7.4
 	github.com/yuin/goldmark-emoji v1.0.3
 	go.uber.org/automaxprocs v1.5.3
 	gocloud.dev v0.36.0
 	golang.org/x/exp v0.0.0-20221031165847-c99f073a8326
-	golang.org/x/image v0.16.0
+	golang.org/x/image v0.18.0
 	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.25.0
 	golang.org/x/sync v0.7.0
-	golang.org/x/text v0.15.0
-	golang.org/x/tools v0.20.0
+	golang.org/x/text v0.16.0
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
 	google.golang.org/api v0.152.0
 	gopkg.in/yaml.v2 v2.4.0
 )
