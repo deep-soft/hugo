@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/gohugoio/hugo/common/hashing"
 	"github.com/gohugoio/hugo/common/types"
-	"github.com/mitchellh/hashstructure"
 )
 
 var (
@@ -47,14 +47,9 @@ func numberToFloat(v reflect.Value) (float64, error) {
 // to make them comparable
 func normalize(v reflect.Value) any {
 	k := v.Kind()
-
 	switch {
 	case !v.Type().Comparable():
-		h, err := hashstructure.Hash(v.Interface(), nil)
-		if err != nil {
-			panic(err)
-		}
-		return h
+		return hashing.HashUint64(v.Interface())
 	case isNumber(k):
 		f, err := numberToFloat(v)
 		if err == nil {

@@ -11,34 +11,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package identity
+package images_test
 
 import (
 	"testing"
 
-	qt "github.com/frankban/quicktest"
+	"github.com/gohugoio/hugo/hugolib"
 )
 
-func TestHashString(t *testing.T) {
-	c := qt.New(t)
+func TestAutoOrient(t *testing.T) {
+	files := `
+-- hugo.toml --
+-- assets/rotate270.jpg --
+sourcefilename: ../testdata/exif/orientation6.jpg
+-- layouts/index.html --
+{{ $img := resources.Get "rotate270.jpg" }}
+W/H original: {{ $img.Width }}/{{ $img.Height }}
+{{ $rotated := $img.Filter images.AutoOrient }}
+W/H rotated: {{ $rotated.Width }}/{{ $rotated.Height }}
+`
 
-	c.Assert(HashString("a", "b"), qt.Equals, "2712570657419664240")
-	c.Assert(HashString("ab"), qt.Equals, "590647783936702392")
-
-	var vals []any = []any{"a", "b", tstKeyer{"c"}}
-
-	c.Assert(HashString(vals...), qt.Equals, "12599484872364427450")
-	c.Assert(vals[2], qt.Equals, tstKeyer{"c"})
-}
-
-type tstKeyer struct {
-	key string
-}
-
-func (t tstKeyer) Key() string {
-	return t.key
-}
-
-func (t tstKeyer) String() string {
-	return "key: " + t.key
+	b := hugolib.Test(t, files)
+	b.AssertFileContent("public/index.html", "W/H original: 80/40\n\nW/H rotated: 40/80")
 }

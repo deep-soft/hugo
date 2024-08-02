@@ -20,8 +20,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/gohugoio/hugo/common/hashing"
 	"github.com/gohugoio/hugo/deps"
-	"github.com/gohugoio/hugo/helpers"
 	"github.com/gohugoio/hugo/tpl"
 	"github.com/mitchellh/mapstructure"
 )
@@ -83,21 +83,21 @@ func (ns *Namespace) DoDefer(ctx context.Context, id string, optsv any) string {
 	templateName := id
 	var key string
 	if opts.Key != "" {
-		key = helpers.MD5String(opts.Key)
+		key = hashing.MD5FromStringHexEncoded(opts.Key)
 	} else {
 		key = strconv.FormatUint(defferedIDCounter.Add(1), 10)
 	}
 
 	id = fmt.Sprintf("%s_%s%s", id, key, tpl.HugoDeferredTemplateSuffix)
 
-	_ = ns.deps.BuildState.DeferredExecutions.Executions.GetOrCreate(id,
-		func() *tpl.DeferredExecution {
+	_, _ = ns.deps.BuildState.DeferredExecutions.Executions.GetOrCreate(id,
+		func() (*tpl.DeferredExecution, error) {
 			return &tpl.DeferredExecution{
 				TemplateName: templateName,
 				Ctx:          ctx,
 				Data:         opts.Data,
 				Executed:     false,
-			}
+			}, nil
 		})
 
 	return id

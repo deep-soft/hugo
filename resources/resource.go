@@ -26,6 +26,7 @@ import (
 	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/resources/internal"
 
+	"github.com/gohugoio/hugo/common/hashing"
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/paths"
 
@@ -307,7 +308,7 @@ type fileInfo interface {
 }
 
 type hashProvider interface {
-	hash() string
+	hash() uint64
 }
 
 var _ resource.StaleInfo = (*StaleValue[any])(nil)
@@ -403,7 +404,7 @@ func (l *genericResource) size() int64 {
 	return l.h.size
 }
 
-func (l *genericResource) hash() string {
+func (l *genericResource) hash() uint64 {
 	if err := l.h.init(l); err != nil {
 		panic(err)
 	}
@@ -628,7 +629,7 @@ type targetPather interface {
 }
 
 type resourceHash struct {
-	value    string
+	value    uint64
 	size     int64
 	initOnce sync.Once
 }
@@ -636,7 +637,7 @@ type resourceHash struct {
 func (r *resourceHash) init(l hugio.ReadSeekCloserProvider) error {
 	var initErr error
 	r.initOnce.Do(func() {
-		var hash string
+		var hash uint64
 		var size int64
 		f, err := l.ReadSeekCloser()
 		if err != nil {
@@ -644,7 +645,7 @@ func (r *resourceHash) init(l hugio.ReadSeekCloserProvider) error {
 			return
 		}
 		defer f.Close()
-		hash, size, err = helpers.MD5FromReaderFast(f)
+		hash, size, err = hashImage(f)
 		if err != nil {
 			initErr = fmt.Errorf("failed to calculate hash: %w", err)
 			return
@@ -654,4 +655,8 @@ func (r *resourceHash) init(l hugio.ReadSeekCloserProvider) error {
 	})
 
 	return initErr
+}
+
+func hashImage(r io.ReadSeeker) (uint64, int64, error) {
+	return hashing.XXHashFromReader(r)
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 The Hugo Authors. All rights reserved.
+// Copyright 2024 The Hugo Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,13 +11,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hugo
+package resources
 
-// CurrentVersion represents the current build version.
-// This should be the only one.
-var CurrentVersion = Version{
-	Major:      0,
-	Minor:      132,
-	PatchLevel: 0,
-	Suffix:     "-DEV",
+import (
+	"os"
+	"testing"
+)
+
+func BenchmarkHashImage(b *testing.B) {
+	f, err := os.Open("testdata/sunset.jpg")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, err := hashImage(f)
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Seek(0, 0)
+	}
 }

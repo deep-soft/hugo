@@ -29,9 +29,9 @@ import (
 	color_extractor "github.com/marekm4/color-extractor"
 
 	"github.com/gohugoio/hugo/cache/filecache"
+	"github.com/gohugoio/hugo/common/hashing"
 	"github.com/gohugoio/hugo/common/hstrings"
 	"github.com/gohugoio/hugo/common/paths"
-	"github.com/gohugoio/hugo/identity"
 
 	"github.com/disintegration/gift"
 
@@ -40,7 +40,6 @@ import (
 
 	"github.com/gohugoio/hugo/resources/resource"
 
-	"github.com/gohugoio/hugo/helpers"
 	"github.com/gohugoio/hugo/resources/images"
 
 	// Blind import for image.Decode
@@ -274,7 +273,7 @@ func (i *imageResource) Filter(filters ...any) (images.ImageResource, error) {
 	}
 
 	conf.Action = "filter"
-	conf.Key = identity.HashString(gfilters)
+	conf.Key = hashing.HashString(gfilters)
 	conf.TargetFormat = targetFormat
 	if conf.TargetFormat == 0 {
 		conf.TargetFormat = i.Format
@@ -481,7 +480,7 @@ func (i *imageResource) getImageMetaCacheTargetPath() string {
 	df := i.getResourcePaths()
 	p1, _ := paths.FileAndExt(df.File)
 	h := i.hash()
-	idStr := identity.HashString(h, i.size(), imageMetaVersionNumber, cfgHash)
+	idStr := hashing.HashString(h, i.size(), imageMetaVersionNumber, cfgHash)
 	df.File = fmt.Sprintf("%s_%s.json", p1, idStr)
 	return df.TargetPath()
 }
@@ -491,36 +490,16 @@ func (i *imageResource) relTargetPathFromConfig(conf images.ImageConfig) interna
 	if conf.TargetFormat != i.Format {
 		p2 = conf.TargetFormat.DefaultExtension()
 	}
-
-	h := i.hash()
-	idStr := fmt.Sprintf("_hu%s_%d", h, i.size())
-
-	// Do not change for no good reason.
-	const md5Threshold = 100
-
-	key := conf.GetKey(i.Format)
-
-	// It is useful to have the key in clear text, but when nesting transforms, it
-	// can easily be too long to read, and maybe even too long
-	// for the different OSes to handle.
-	if len(p1)+len(idStr)+len(p2) > md5Threshold {
-		key = helpers.MD5String(p1 + key + p2)
-		huIdx := strings.Index(p1, "_hu")
-		if huIdx != -1 {
-			p1 = p1[:huIdx]
-		} else {
-			// This started out as a very long file name. Making it even longer
-			// could melt ice in the Arctic.
-			p1 = ""
-		}
-	} else if strings.Contains(p1, idStr) {
-		// On scaling an already scaled image, we get the file info from the original.
-		// Repeating the same info in the filename makes it stuttery for no good reason.
-		idStr = ""
+	const prefix = "_hu"
+	huIdx := strings.LastIndex(p1, prefix)
+	incomingID := "i"
+	if huIdx > -1 {
+		incomingID = p1[huIdx+len(prefix):]
+		p1 = p1[:huIdx]
 	}
-
+	hash := hashing.HashUint64(incomingID, i.hash(), conf.GetKey(i.Format))
 	rp := i.getResourcePaths()
-	rp.File = fmt.Sprintf("%s%s_%s%s", p1, idStr, key, p2)
+	rp.File = fmt.Sprintf("%s%s%d%s", p1, prefix, hash, p2)
 
 	return rp
 }
