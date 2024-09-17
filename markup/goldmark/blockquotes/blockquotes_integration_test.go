@@ -32,9 +32,9 @@ func TestBlockquoteHook(t *testing.T) {
         block = true
         title = true
 -- layouts/_default/_markup/render-blockquote.html --
-Blockquote: |{{ .Text | safeHTML }}|{{ .Type }}|
+Blockquote: |{{ .Text }}|{{ .Type }}|
 -- layouts/_default/_markup/render-blockquote-alert.html --
-{{ $text := .Text | safeHTML }}
+{{ $text := .Text }}
 Blockquote Alert: |{{ $text }}|{{ .Type }}|
 Blockquote Alert Attributes: |{{ $text }}|{{ .Attributes }}|
 Blockquote Alert Page: |{{ $text }}|{{ .Page.Title }}|{{ .PageInner.Title }}|
@@ -76,7 +76,7 @@ title: "p1"
 `
 
 	b := hugolib.Test(t, files)
-	b.AssertFileContent("public/p1/index.html",
+	b.AssertFileContentExact("public/p1/index.html",
 		"Blockquote Alert: |<p>This is a note with some whitespace after the alert type.</p>\n|alert|",
 		"Blockquote Alert: |<p>This is a tip.</p>",
 		"Blockquote Alert: |<p>This is a caution with some whitespace before the alert type.</p>\n|alert|",
@@ -107,5 +107,52 @@ Content: {{ .Content }}
 `
 
 	b := hugolib.Test(t, files)
-	b.AssertFileContent("public/p1/index.html", "Content: <blockquote>\n</blockquote>\n")
+	b.AssertFileContentExact("public/p1/index.html", "Content: <blockquote>\n</blockquote>\n")
+}
+
+func TestBlockquObsidianWithTitleAndSign(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+-- content/_index.md --
+---
+title: "Home"
+---
+
+> [!danger]
+> Do not approach or handle without protective gear.
+
+> [!tip] Callouts can have custom titles
+> Like this one.
+
+> [!tip] Title-only callout
+
+> [!faq]- Foldable negated callout
+> Yes! In a foldable callout, the contents are hidden when the callout is collapsed
+
+> [!faq]+ Foldable callout
+> Yes! In a foldable callout, the contents are hidden when the callout is collapsed
+
+> [!info] Can callouts be nested?
+> > [!important] Yes!, they can.
+> > > [!tip] You can even use multiple layers of nesting.
+
+-- layouts/index.html --
+{{ .Content }}
+-- layouts/_default/_markup/render-blockquote.html --
+AlertType: {{ .AlertType }}|AlertTitle: {{ .AlertTitle }}|AlertSign: {{ .AlertSign | safeHTML }}|Text: {{ .Text }}|
+	
+	`
+
+	b := hugolib.Test(t, files)
+	b.AssertFileContentExact("public/index.html",
+		"AlertType: tip|AlertTitle: Callouts can have custom titles|AlertSign: |",
+		"AlertType: tip|AlertTitle: Title-only callout|AlertSign: |",
+		"AlertType: faq|AlertTitle: Foldable negated callout|AlertSign: -|Text: <p>Yes! In a foldable callout, the contents are hidden when the callout is collapsed</p>\n|",
+		"AlertType: faq|AlertTitle: Foldable callout|AlertSign: +|Text: <p>Yes! In a foldable callout, the contents are hidden when the callout is collapsed</p>\n|",
+		"AlertType: danger|AlertTitle: |AlertSign: |Text: <p>Do not approach or handle without protective gear.</p>\n|",
+		"AlertTitle: Can callouts be nested?|",
+		"AlertTitle: You can even use multiple layers of nesting.|",
+	)
 }

@@ -16,10 +16,8 @@ package blockquotes
 import (
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/gohugoio/hugo/common/herrors"
-	htext "github.com/gohugoio/hugo/common/text"
 	"github.com/gohugoio/hugo/common/types/hstring"
 	"github.com/gohugoio/hugo/markup/converter/hooks"
 	"github.com/gohugoio/hugo/markup/goldmark/internal/render"
@@ -71,68 +69,34 @@ func (r *htmlRenderer) renderBlockquote(w util.BufWriter, src []byte, node ast.N
 		return ast.WalkContinue, nil
 	}
 
-	pos := ctx.PopPos()
-	text := ctx.Buffer.Bytes()[pos:]
-	ctx.Buffer.Truncate(pos)
+	text := ctx.PopRenderedString()
 
 	ordinal := ctx.GetAndIncrementOrdinal(ast.KindBlockquote)
 
-	texts := string(text)
 	typ := typeRegular
-	alertType := resolveGitHubAlert(texts)
-	if alertType != "" {
+	alert := resolveBlockQuoteAlert(string(text))
+	if alert.typ != "" {
 		typ = typeAlert
 	}
 
 	renderer := ctx.RenderContext().GetRenderer(hooks.BlockquoteRendererType, typ)
 	if renderer == nil {
-		return r.renderBlockquoteDefault(w, n, texts)
+		return r.renderBlockquoteDefault(w, n, text)
 	}
 
 	if typ == typeAlert {
 		// Trim preamble: <p>[!NOTE]<br>\n but preserve leading paragraph.
 		// We could possibly complicate this by moving this to the parser, but
 		// keep it simple for now.
-		texts = "<p>" + texts[strings.Index(texts, "\n")+1:]
-	}
-
-	var sourceRef []byte
-
-	// Extract a source sample to use for position information.
-	if nn := n.FirstChild(); nn != nil {
-		var start, stop int
-		for i := 0; i < nn.Lines().Len() && i < 2; i++ {
-			line := nn.Lines().At(i)
-			if i == 0 {
-				start = line.Start
-			}
-			stop = line.Stop
-		}
-		// We do not mutate the source, so this is safe.
-		sourceRef = src[start:stop]
+		text = "<p>" + text[strings.Index(text, "\n")+1:]
 	}
 
 	bqctx := &blockquoteContext{
-		page:             ctx.DocumentContext().Document,
-		pageInner:        r.getPageInner(ctx),
+		BaseContext:      render.NewBaseContext(ctx, renderer, n, src, nil, ordinal),
 		typ:              typ,
-		alertType:        alertType,
-		text:             hstring.RenderedString(texts),
-		sourceRef:        sourceRef,
-		ordinal:          ordinal,
+		alert:            alert,
+		text:             hstring.HTML(text),
 		AttributesHolder: attributes.New(n.Attributes(), attributes.AttributesOwnerGeneral),
-	}
-
-	bqctx.createPos = func() htext.Position {
-		if resolver, ok := renderer.(hooks.ElementPositionResolver); ok {
-			return resolver.ResolvePosition(bqctx)
-		}
-
-		return htext.Position{
-			Filename:     ctx.DocumentContext().Filename,
-			LineNumber:   1,
-			ColumnNumber: 1,
-		}
 	}
 
 	cr := renderer.(hooks.BlockquoteRenderer)
@@ -143,22 +107,10 @@ func (r *htmlRenderer) renderBlockquote(w util.BufWriter, src []byte, node ast.N
 		bqctx,
 	)
 	if err != nil {
-		return ast.WalkContinue, herrors.NewFileErrorFromPos(err, bqctx.createPos())
+		return ast.WalkContinue, herrors.NewFileErrorFromPos(err, bqctx.Position())
 	}
 
 	return ast.WalkContinue, nil
-}
-
-func (r *htmlRenderer) getPageInner(rctx *render.Context) any {
-	pid := rctx.PeekPid()
-	if pid > 0 {
-		if lookup := rctx.DocumentContext().DocumentLookup; lookup != nil {
-			if v := rctx.DocumentContext().DocumentLookup(pid); v != nil {
-				return v
-			}
-		}
-	}
-	return rctx.DocumentContext().Document
 }
 
 // Code borrowed from goldmark's html renderer.
@@ -180,20 +132,10 @@ func (r *htmlRenderer) renderBlockquoteDefault(
 }
 
 type blockquoteContext struct {
-	page      any
-	pageInner any
-	text      hstring.RenderedString
-	typ       string
-	sourceRef []byte
-	alertType string
-	ordinal   int
-
-	// This is only used in error situations and is expensive to create,
-	// so delay creation until needed.
-	pos       htext.Position
-	posInit   sync.Once
-	createPos func() htext.Position
-
+	hooks.BaseContext
+	text  hstring.HTML
+	typ   string
+	alert blockQuoteAlert
 	*attributes.AttributesHolder
 }
 
@@ -202,50 +144,42 @@ func (c *blockquoteContext) Type() string {
 }
 
 func (c *blockquoteContext) AlertType() string {
-	return c.alertType
+	return c.alert.typ
 }
 
-func (c *blockquoteContext) Page() any {
-	return c.page
+func (c *blockquoteContext) AlertTitle() hstring.HTML {
+	return hstring.HTML(c.alert.title)
 }
 
-func (c *blockquoteContext) PageInner() any {
-	return c.pageInner
+func (c *blockquoteContext) AlertSign() string {
+	return c.alert.sign
 }
 
-func (c *blockquoteContext) Text() hstring.RenderedString {
+func (c *blockquoteContext) Text() hstring.HTML {
 	return c.text
 }
 
-func (c *blockquoteContext) Ordinal() int {
-	return c.ordinal
-}
+var blockQuoteAlertRe = regexp.MustCompile(`^<p>\[!([a-zA-Z]+)\](-|\+)?[^\S\r\n]?([^\n]*)\n?`)
 
-func (c *blockquoteContext) Position() htext.Position {
-	c.posInit.Do(func() {
-		c.pos = c.createPos()
-	})
-	return c.pos
-}
-
-func (c *blockquoteContext) PositionerSourceTarget() []byte {
-	return c.sourceRef
-}
-
-var _ hooks.PositionerSourceTargetProvider = (*blockquoteContext)(nil)
-
-// https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts
-// Five types:
-// [!NOTE], [!TIP], [!WARNING], [!IMPORTANT], [!CAUTION]
-// Note that GitHub's implementation is case-insensitive.
-var gitHubAlertRe = regexp.MustCompile(`(?i)^<p>\[!(NOTE|TIP|WARNING|IMPORTANT|CAUTION)\]`)
-
-// resolveGitHubAlert returns one of note, tip, warning, important or caution.
-// An empty string if no match.
-func resolveGitHubAlert(s string) string {
-	m := gitHubAlertRe.FindStringSubmatch(s)
-	if len(m) == 2 {
-		return strings.ToLower(m[1])
+func resolveBlockQuoteAlert(s string) blockQuoteAlert {
+	m := blockQuoteAlertRe.FindStringSubmatch(s)
+	if len(m) == 4 {
+		title := strings.TrimSpace(m[3])
+		title = strings.TrimRight(title, "</p>")
+		return blockQuoteAlert{
+			typ:   strings.ToLower(m[1]),
+			sign:  m[2],
+			title: title,
+		}
 	}
-	return ""
+
+	return blockQuoteAlert{}
+}
+
+// Blockquote alert syntax was introduced by GitHub, but is also used
+// by Obsidian which also support some extended attributes: More types, alert titles and a +/- sign for folding.
+type blockQuoteAlert struct {
+	typ   string
+	sign  string
+	title string
 }

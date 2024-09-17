@@ -41,7 +41,7 @@ type LinkContext interface {
 	Title() string
 
 	// The rendered (HTML) text.
-	Text() hstring.RenderedString
+	Text() hstring.HTML
 
 	// The plain variant of Text.
 	PlainText() string
@@ -61,9 +61,8 @@ type ImageLinkContext interface {
 
 // CodeblockContext is the context passed to a code block render hook.
 type CodeblockContext interface {
+	BaseContext
 	AttributesProvider
-	text.Positioner
-	PageProvider
 
 	// Chroma highlighting processing options. This will only be filled if Type is a known Chroma Lexer.
 	Options() map[string]any
@@ -73,23 +72,35 @@ type CodeblockContext interface {
 
 	// The text between the code fences.
 	Inner() string
+}
 
-	// Zero-based ordinal for all code blocks in the current document.
+// TableContext is the context passed to a table render hook.
+type TableContext interface {
+	BaseContext
+	AttributesProvider
+
+	THead() []TableRow
+	TBody() []TableRow
+}
+
+// BaseContext is the base context used in most render hooks.
+type BaseContext interface {
+	text.Positioner
+	PageProvider
+
+	// Zero-based ordinal for all elements of this kind in the current document.
 	Ordinal() int
 }
 
 // BlockquoteContext is the context passed to a blockquote render hook.
 type BlockquoteContext interface {
-	AttributesProvider
-	text.Positioner
-	PageProvider
+	BaseContext
 
-	// Zero-based ordinal for all block quotes in the current document.
-	Ordinal() int
+	AttributesProvider
 
 	// The blockquote text.
 	// If type is "alert", this will be the alert text.
-	Text() hstring.RenderedString
+	Text() hstring.HTML
 
 	/// Returns the blockquote type, one of "regular" and "alert".
 	// Type "alert" indicates that this is a GitHub type alert.
@@ -98,6 +109,16 @@ type BlockquoteContext interface {
 	// The GitHub alert type converted to lowercase, e.g. "note".
 	// Only set if Type is "alert".
 	AlertType() string
+
+	// The alert title.
+	// Currently only relevant for Obsidian alerts.
+	// GitHub does not suport alert titles and will not render alerts with titles.
+	AlertTitle() hstring.HTML
+
+	// The alert sign,  "+" or "-" or "" used to indicate folding.
+	// Currently only relevant for Obsidian alerts.
+	// GitHub does not suport alert signs and will not render alerts with signs.
+	AlertSign() string
 }
 
 type PositionerSourceTargetProvider interface {
@@ -107,18 +128,14 @@ type PositionerSourceTargetProvider interface {
 
 // PassThroughContext is the context passed to a passthrough render hook.
 type PassthroughContext interface {
+	BaseContext
 	AttributesProvider
-	text.Positioner
-	PageProvider
 
 	// Currently one of "inline" or "block".
 	Type() string
 
 	// The inner content of the passthrough element, excluding the delimiters.
 	Inner() string
-
-	// Zero-based ordinal for all passthrough elements in the document.
-	Ordinal() int
 }
 
 type AttributesOptionsSliceProvider interface {
@@ -138,6 +155,10 @@ type BlockquoteRenderer interface {
 	RenderBlockquote(cctx context.Context, w hugio.FlexiWriter, ctx BlockquoteContext) error
 }
 
+type TableRenderer interface {
+	RenderTable(cctx context.Context, w hugio.FlexiWriter, ctx TableContext) error
+}
+
 type PassthroughRenderer interface {
 	RenderPassthrough(cctx context.Context, w io.Writer, ctx PassthroughContext) error
 }
@@ -155,7 +176,7 @@ type HeadingContext interface {
 	// Anchor is the HTML id assigned to the heading.
 	Anchor() string
 	// Text is the rendered (HTML) heading text, excluding the heading marker.
-	Text() hstring.RenderedString
+	Text() hstring.HTML
 	// PlainText is the unrendered version of Text.
 	PlainText() string
 
@@ -196,6 +217,19 @@ const (
 	CodeBlockRendererType
 	PassthroughRendererType
 	BlockquoteRendererType
+	TableRendererType
 )
 
 type GetRendererFunc func(t RendererType, id any) any
+
+type TableCell struct {
+	Text      hstring.HTML
+	Alignment string // left, center, or right
+}
+
+type TableRow []TableCell
+
+type Table struct {
+	THead []TableRow
+	TBody []TableRow
+}

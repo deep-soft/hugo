@@ -7,8 +7,8 @@ keywords: []
 menu:
   docs:
     parent: render-hooks
-    weight: 40
-weight: 40
+    weight: 50
+weight: 50
 toc: true
 ---
 
@@ -24,7 +24,9 @@ Heading render hook templates receive the following [context]:
 
 ###### Attributes
 
-(`map`) The Markdown attributes, available if you configure your site as follows:
+(`map`) The [Markdown attributes], available if you configure your site as follows:
+
+[Markdown attributes]: /content-management/markdown-attributes/
 
 {{< code-toggle file=hugo >}}
 [markup.goldmark.parser.attribute]
@@ -53,7 +55,7 @@ title = true
 
 ###### Text
 
-(`string`) The heading text.
+(`template.HTML`) The heading text.
 
 ## Examples
 
@@ -63,7 +65,7 @@ In its default configuration, Hugo renders Markdown headings according to the [C
 
 {{< code file=layouts/_default/_markup/render-heading.html copy=true >}}
 <h{{ .Level }} id="{{ .Anchor }}">
-  {{- .Text | safeHTML -}}
+  {{- .Text -}}
 </h{{ .Level }}>
 {{< /code >}}
 
@@ -71,7 +73,7 @@ To add an anchor link to the right of each heading:
 
 {{< code file=layouts/_default/_markup/render-heading.html copy=true >}}
 <h{{ .Level }} id="{{ .Anchor }}">
-  {{ .Text | safeHTML }}
+  {{ .Text }}
   <a href="#{{ .Anchor }}">#</a>
 </h{{ .Level }}>
 {{< /code >}}

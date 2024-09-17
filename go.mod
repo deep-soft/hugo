@@ -12,10 +12,10 @@ require (
 	github.com/bep/goat v0.5.0
 	github.com/bep/godartsass v1.2.0
 	github.com/bep/godartsass/v2 v2.1.0
-	github.com/bep/golibsass v1.1.1
+	github.com/bep/golibsass v1.2.0
 	github.com/bep/gowebp v0.3.0
 	github.com/bep/helpers v0.4.0
-	github.com/bep/imagemeta v0.8.0
+	github.com/bep/imagemeta v0.8.1
 	github.com/bep/lazycache v0.4.0
 	github.com/bep/logg v0.4.0
 	github.com/bep/mclib v1.20400.20402
@@ -27,7 +27,7 @@ require (
 	github.com/cli/safeexec v1.0.1
 	github.com/disintegration/gift v1.2.1
 	github.com/dustin/go-humanize v1.0.1
-	github.com/evanw/esbuild v0.23.0
+	github.com/evanw/esbuild v0.23.1
 	github.com/fatih/color v1.17.0
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/frankban/quicktest v1.14.6
@@ -59,7 +59,7 @@ require (
 	github.com/niklasfasching/go-org v1.7.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-	github.com/pelletier/go-toml/v2 v2.2.2
+	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/rogpeppe/go-internal v1.12.0
 	github.com/sanity-io/litter v1.5.5
 	github.com/spf13/afero v1.11.0

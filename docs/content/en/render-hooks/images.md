@@ -7,8 +7,8 @@ keywords: []
 menu:
   docs:
     parent: render-hooks
-    weight: 50
-weight: 50
+    weight: 60
+weight: 60
 toc: true
 ---
 
@@ -32,7 +32,9 @@ Image render hook templates receive the following context:
 
 ###### Attributes
 
-(`map`) The Markdown attributes, available if you configure your site as follows:
+(`map`) The [Markdown attributes], available if you configure your site as follows:
+
+[Markdown attributes]: /content-management/markdown-attributes/
 
 {{< code-toggle file=hugo >}}
 [markup.goldmark.parser]
@@ -71,7 +73,7 @@ block = true
 
 ###### Text
 
-(`string`) The image description.
+(`template.HTML`) The image description.
 
 ###### Title
 
@@ -141,7 +143,7 @@ The embedded image render hook is automatically enabled for multilingual single-
 [duplication of shared page resources]: /getting-started/configuration-markup/#duplicateresourcefiles
 {{% /note %}}
 
-The embedded image render hook resolves internal Markdown destinations by looking for a matching [page resource], falling back to a matching [global resource]. Remote destinations are passed through, and the render hook will not throw an error or warning if it is unable to resolve a destination.
+The embedded image render hook resolves internal Markdown destinations by looking for a matching [page resource], falling back to a matching [global resource]. Remote destinations are passed through, and the render hook will not throw an error or warning if unable to resolve a destination.
 
 [page resource]: /getting-started/glossary/#page-resource
 [global resource]: /getting-started/glossary/#global-resource

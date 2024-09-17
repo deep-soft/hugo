@@ -52,7 +52,7 @@ type linkContext struct {
 	pageInner   any
 	destination string
 	title       string
-	text        hstring.RenderedString
+	text        hstring.HTML
 	plainText   string
 	*attributes.AttributesHolder
 }
@@ -69,7 +69,7 @@ func (ctx linkContext) PageInner() any {
 	return ctx.pageInner
 }
 
-func (ctx linkContext) Text() hstring.RenderedString {
+func (ctx linkContext) Text() hstring.HTML {
 	return ctx.text
 }
 
@@ -100,7 +100,7 @@ type headingContext struct {
 	pageInner any
 	level     int
 	anchor    string
-	text      hstring.RenderedString
+	text      hstring.HTML
 	plainText string
 	*attributes.AttributesHolder
 }
@@ -121,7 +121,7 @@ func (ctx headingContext) Anchor() string {
 	return ctx.anchor
 }
 
-func (ctx headingContext) Text() hstring.RenderedString {
+func (ctx headingContext) Text() hstring.HTML {
 	return ctx.text
 }
 
@@ -169,9 +169,7 @@ func (r *hookedRenderer) renderImage(w util.BufWriter, source []byte, node ast.N
 		return ast.WalkContinue, nil
 	}
 
-	pos := ctx.PopPos()
-	text := ctx.Buffer.Bytes()[pos:]
-	ctx.Buffer.Truncate(pos)
+	text := ctx.PopRenderedString()
 
 	var (
 		isBlock bool
@@ -190,16 +188,18 @@ func (r *hookedRenderer) renderImage(w util.BufWriter, source []byte, node ast.N
 	// internal attributes before rendering.
 	attrs := r.filterInternalAttributes(n.Attributes())
 
+	page, pageInner := render.GetPageAndPageInner(ctx)
+
 	err := lr.RenderLink(
 		ctx.RenderContext().Ctx,
 		w,
 		imageLinkContext{
 			linkContext: linkContext{
-				page:             ctx.DocumentContext().Document,
-				pageInner:        r.getPageInner(ctx),
+				page:             page,
+				pageInner:        pageInner,
 				destination:      string(n.Destination),
 				title:            string(n.Title),
-				text:             hstring.RenderedString(text),
+				text:             hstring.HTML(text),
 				plainText:        string(n.Text(source)),
 				AttributesHolder: attributes.New(attrs, attributes.AttributesOwnerGeneral),
 			},
@@ -209,18 +209,6 @@ func (r *hookedRenderer) renderImage(w util.BufWriter, source []byte, node ast.N
 	)
 
 	return ast.WalkContinue, err
-}
-
-func (r *hookedRenderer) getPageInner(rctx *render.Context) any {
-	pid := rctx.PeekPid()
-	if pid > 0 {
-		if lookup := rctx.DocumentContext().DocumentLookup; lookup != nil {
-			if v := rctx.DocumentContext().DocumentLookup(pid); v != nil {
-				return v
-			}
-		}
-	}
-	return rctx.DocumentContext().Document
 }
 
 func (r *hookedRenderer) filterInternalAttributes(attrs []ast.Attribute) []ast.Attribute {
@@ -288,19 +276,19 @@ func (r *hookedRenderer) renderLink(w util.BufWriter, source []byte, node ast.No
 		return ast.WalkContinue, nil
 	}
 
-	pos := ctx.PopPos()
-	text := ctx.Buffer.Bytes()[pos:]
-	ctx.Buffer.Truncate(pos)
+	text := ctx.PopRenderedString()
+
+	page, pageInner := render.GetPageAndPageInner(ctx)
 
 	err := lr.RenderLink(
 		ctx.RenderContext().Ctx,
 		w,
 		linkContext{
-			page:             ctx.DocumentContext().Document,
-			pageInner:        r.getPageInner(ctx),
+			page:             page,
+			pageInner:        pageInner,
 			destination:      string(n.Destination),
 			title:            string(n.Title),
-			text:             hstring.RenderedString(text),
+			text:             hstring.HTML(text),
 			plainText:        string(n.Text(source)),
 			AttributesHolder: attributes.Empty,
 		},
@@ -358,14 +346,16 @@ func (r *hookedRenderer) renderAutoLink(w util.BufWriter, source []byte, node as
 		url = "mailto:" + url
 	}
 
+	page, pageInner := render.GetPageAndPageInner(ctx)
+
 	err := lr.RenderLink(
 		ctx.RenderContext().Ctx,
 		w,
 		linkContext{
-			page:             ctx.DocumentContext().Document,
-			pageInner:        r.getPageInner(ctx),
+			page:             page,
+			pageInner:        pageInner,
 			destination:      url,
-			text:             hstring.RenderedString(label),
+			text:             hstring.HTML(label),
 			plainText:        label,
 			AttributesHolder: attributes.Empty,
 		},
@@ -435,23 +425,24 @@ func (r *hookedRenderer) renderHeading(w util.BufWriter, source []byte, node ast
 		return ast.WalkContinue, nil
 	}
 
-	pos := ctx.PopPos()
-	text := ctx.Buffer.Bytes()[pos:]
-	ctx.Buffer.Truncate(pos)
+	text := ctx.PopRenderedString()
+
 	// All ast.Heading nodes are guaranteed to have an attribute called "id"
 	// that is an array of bytes that encode a valid string.
 	anchori, _ := n.AttributeString("id")
 	anchor := anchori.([]byte)
 
+	page, pageInner := render.GetPageAndPageInner(ctx)
+
 	err := hr.RenderHeading(
 		ctx.RenderContext().Ctx,
 		w,
 		headingContext{
-			page:             ctx.DocumentContext().Document,
-			pageInner:        r.getPageInner(ctx),
+			page:             page,
+			pageInner:        pageInner,
 			level:            n.Level,
 			anchor:           string(anchor),
-			text:             hstring.RenderedString(text),
+			text:             hstring.HTML(text),
 			plainText:        string(n.Text(source)),
 			AttributesHolder: attributes.New(n.Attributes(), attributes.AttributesOwnerGeneral),
 		},
