@@ -58,7 +58,7 @@ func (c *configCommand) Name() string {
 }
 
 func (c *configCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
-	conf, err := c.r.ConfigFromProvider(c.r.configVersionID.Load(), flagsToCfg(cd, nil))
+	conf, err := c.r.ConfigFromProvider(configKey{counter: c.r.configVersionID.Load()}, flagsToCfg(cd, nil))
 	if err != nil {
 		return err
 	}
@@ -110,8 +110,8 @@ func (c *configCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, arg
 func (c *configCommand) Init(cd *simplecobra.Commandeer) error {
 	c.r = cd.Root.Command.(*rootCommand)
 	cmd := cd.CobraCommand
-	cmd.Short = "Print the site configuration"
-	cmd.Long = `Print the site configuration, both default and custom settings.`
+	cmd.Short = "Display site configuration"
+	cmd.Long = `Display site configuration, both default and custom settings.`
 	cmd.Flags().StringVar(&c.format, "format", "toml", "preferred file format (toml, yaml or json)")
 	_ = cmd.RegisterFlagCompletionFunc("format", cobra.FixedCompletions([]string{"toml", "yaml", "json"}, cobra.ShellCompDirectiveNoFileComp))
 	cmd.Flags().StringVar(&c.lang, "lang", "", "the language to display config for. Defaults to the first language defined.")
@@ -209,7 +209,7 @@ func (c *configMountsCommand) Name() string {
 
 func (c *configMountsCommand) Run(ctx context.Context, cd *simplecobra.Commandeer, args []string) error {
 	r := c.configCmd.r
-	conf, err := r.ConfigFromProvider(r.configVersionID.Load(), flagsToCfg(cd, nil))
+	conf, err := r.ConfigFromProvider(configKey{counter: c.r.configVersionID.Load()}, flagsToCfg(cd, nil))
 	if err != nil {
 		return err
 	}
