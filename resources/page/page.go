@@ -51,14 +51,6 @@ type AlternativeOutputFormatsProvider interface {
 	AlternativeOutputFormats() OutputFormats
 }
 
-// AuthorProvider provides author information.
-type AuthorProvider interface {
-	// Deprecated: Use taxonomies instead.
-	Author() Author
-	// Deprecated: Use taxonomies instead.
-	Authors() AuthorList
-}
-
 // ChildCareProvider provides accessors to child resources.
 type ChildCareProvider interface {
 	// Pages returns a list of pages of all kinds.
@@ -309,9 +301,6 @@ type PageWithoutContent interface {
 	Positioner
 	navigation.PageMenusProvider
 
-	// TODO(bep)
-	AuthorProvider
-
 	// Page lookups/refs
 	GetPageProvider
 	RefProvider
@@ -331,9 +320,7 @@ type PageWithoutContent interface {
 	// Deprecated: From Hugo v0.138.0 this is just an alias for Store.
 	Scratch() *maps.Scratch
 
-	// Store returns a Scratch that can be used to store temporary state.
-	// In contrast to Scratch(), this Scratch is not reset on server rebuilds.
-	Store() *maps.Scratch
+	maps.StoreProvider
 
 	RelatedKeywordsProvider
 
