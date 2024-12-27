@@ -42,6 +42,7 @@ import (
 	"github.com/gohugoio/hugo/deps"
 	"github.com/gohugoio/hugo/hugolib/doctree"
 	"github.com/gohugoio/hugo/hugolib/pagesfromdata"
+	"github.com/gohugoio/hugo/internal/js/esbuild"
 	"github.com/gohugoio/hugo/internal/warpc"
 	"github.com/gohugoio/hugo/langs/i18n"
 	"github.com/gohugoio/hugo/modules"
@@ -145,8 +146,11 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 		if cfg.Configs.Base.PanicOnWarning {
 			logHookLast = loggers.PanicOnWarningHook
 		}
-		if cfg.LogOut == nil {
-			cfg.LogOut = os.Stdout
+		if cfg.StdOut == nil {
+			cfg.StdOut = os.Stdout
+		}
+		if cfg.StdErr == nil {
+			cfg.StdErr = os.Stderr
 		}
 		if cfg.LogLevel == 0 {
 			cfg.LogLevel = logg.LevelWarn
@@ -156,8 +160,8 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 			Level:              cfg.LogLevel,
 			DistinctLevel:      logg.LevelWarn, // This will drop duplicate log warning and errors.
 			HandlerPost:        logHookLast,
-			Stdout:             cfg.LogOut,
-			Stderr:             cfg.LogOut,
+			StdOut:             cfg.StdOut,
+			StdErr:             cfg.StdErr,
 			StoreErrors:        conf.Watching(),
 			SuppressStatements: conf.IgnoredLogs(),
 		}
@@ -201,6 +205,12 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 	if err := firstSiteDeps.Init(); err != nil {
 		return nil, err
 	}
+
+	batcherClient, err := esbuild.NewBatcherClient(firstSiteDeps)
+	if err != nil {
+		return nil, err
+	}
+	firstSiteDeps.JSBatcherClient = batcherClient
 
 	confm := cfg.Configs
 	if err := confm.Validate(logger); err != nil {
@@ -310,7 +320,6 @@ func NewHugoSites(cfg deps.DepsCfg) (*HugoSites, error) {
 		return li.Lang < lj.Lang
 	})
 
-	var err error
 	h, err = newHugoSites(cfg, firstSiteDeps, pageTrees, sites)
 	if err == nil && h == nil {
 		panic("hugo: newHugoSitesNew returned nil error and nil HugoSites")
@@ -1215,6 +1224,8 @@ func (s *Site) assembleMenus() error {
 			// If page is still nill, we must make sure that we have a URL that considers baseURL etc.
 			if types.IsNil(me.Page) {
 				me.ConfiguredURL = s.createNodeMenuEntryURL(me.MenuConfig.URL)
+			} else {
+				navigation.SetPageValues(me, me.Page)
 			}
 
 			flat[twoD{name, me.KeyName()}] = me
@@ -1493,7 +1504,11 @@ func (s *Site) renderForTemplate(ctx context.Context, name, outputFormat string,
 	}
 
 	if err = s.Tmpl().ExecuteWithContext(ctx, templ, w, d); err != nil {
-		return fmt.Errorf("render of %q failed: %w", name, err)
+		filename := name
+		if p, ok := d.(*pageState); ok {
+			filename = p.String()
+		}
+		return fmt.Errorf("render of %q failed: %w", filename, err)
 	}
 	return
 }

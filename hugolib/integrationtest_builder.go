@@ -25,6 +25,7 @@ import (
 	"github.com/gohugoio/hugo/common/hexec"
 	"github.com/gohugoio/hugo/common/loggers"
 	"github.com/gohugoio/hugo/common/maps"
+	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/config"
 	"github.com/gohugoio/hugo/config/allconfig"
 	"github.com/gohugoio/hugo/config/security"
@@ -69,6 +70,13 @@ func TestOptDebug() TestOpt {
 	}
 }
 
+// TestOptInfo will enable info logging in integration tests.
+func TestOptInfo() TestOpt {
+	return func(c *IntegrationTestConfig) {
+		c.LogLevel = logg.LevelInfo
+	}
+}
+
 // TestOptWarn will enable warn logging in integration tests.
 func TestOptWarn() TestOpt {
 	return func(c *IntegrationTestConfig) {
@@ -87,6 +95,13 @@ func TestOptOsFs() TestOpt {
 func TestOptWithNFDOnDarwin() TestOpt {
 	return func(c *IntegrationTestConfig) {
 		c.NFDFormOnDarwin = true
+	}
+}
+
+// TestOptWithOSFs enables the real file system.
+func TestOptWithOSFs() TestOpt {
+	return func(c *IntegrationTestConfig) {
+		c.NeedsOsFS = true
 	}
 }
 
@@ -284,8 +299,9 @@ func (s *IntegrationTestBuilder) negate(match string) (string, bool) {
 func (s *IntegrationTestBuilder) AssertFileContent(filename string, matches ...string) {
 	s.Helper()
 	content := strings.TrimSpace(s.FileContent(filename))
+
 	for _, m := range matches {
-		cm := qt.Commentf("File: %s Match %s", filename, m)
+		cm := qt.Commentf("File: %s Match %s\nContent:\n%s", filename, m, content)
 		lines := strings.Split(m, "\n")
 		for _, match := range lines {
 			match = strings.TrimSpace(match)
@@ -313,7 +329,8 @@ func (s *IntegrationTestBuilder) AssertFileContentExact(filename string, matches
 	s.Helper()
 	content := s.FileContent(filename)
 	for _, m := range matches {
-		s.Assert(content, qt.Contains, m, qt.Commentf(m))
+		cm := qt.Commentf("File: %s Match %s\nContent:\n%s", filename, m, content)
+		s.Assert(content, qt.Contains, m, cm)
 	}
 }
 
@@ -448,6 +465,33 @@ func (s *IntegrationTestBuilder) Build() *IntegrationTestBuilder {
 	})
 
 	return s
+}
+
+func (s *IntegrationTestBuilder) BuildPartial(urls ...string) *IntegrationTestBuilder {
+	if _, err := s.BuildPartialE(urls...); err != nil {
+		s.Fatal(err)
+	}
+	return s
+}
+
+func (s *IntegrationTestBuilder) BuildPartialE(urls ...string) (*IntegrationTestBuilder, error) {
+	if s.buildCount == 0 {
+		panic("BuildPartial can only be used after a full build")
+	}
+	if !s.Cfg.Running {
+		panic("BuildPartial can only be used in server mode")
+	}
+	visited := types.NewEvictingStringQueue(len(urls))
+	for _, url := range urls {
+		visited.Add(url)
+	}
+	buildCfg := BuildCfg{RecentlyVisited: visited, PartialReRender: true}
+	return s, s.build(buildCfg)
+}
+
+func (s *IntegrationTestBuilder) Close() {
+	s.Helper()
+	s.Assert(s.H.Close(), qt.IsNil)
 }
 
 func (s *IntegrationTestBuilder) LogString() string {
@@ -639,8 +683,8 @@ func (s *IntegrationTestBuilder) initBuilder() error {
 
 		logger := loggers.New(
 			loggers.Options{
-				Stdout:        w,
-				Stderr:        w,
+				StdOut:        w,
+				StdErr:        w,
 				Level:         s.Cfg.LogLevel,
 				DistinctLevel: logg.LevelWarn,
 			},
@@ -664,7 +708,7 @@ func (s *IntegrationTestBuilder) initBuilder() error {
 
 		s.Assert(err, qt.IsNil)
 
-		depsCfg := deps.DepsCfg{Configs: res, Fs: fs, LogLevel: logger.Level(), LogOut: logger.Out()}
+		depsCfg := deps.DepsCfg{Configs: res, Fs: fs, LogLevel: logger.Level(), StdErr: logger.StdErr()}
 		sites, err := NewHugoSites(depsCfg)
 		if err != nil {
 			initErr = err
@@ -725,10 +769,6 @@ func (s *IntegrationTestBuilder) build(cfg BuildCfg) error {
 	changeEvents := s.changeEvents()
 	s.counters = &buildCounters{}
 	cfg.testCounters = s.counters
-
-	if s.buildCount > 0 && (len(changeEvents) == 0) {
-		return nil
-	}
 
 	s.buildCount++
 
