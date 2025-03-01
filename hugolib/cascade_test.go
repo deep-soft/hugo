@@ -841,3 +841,79 @@ title: p1
 	b.AssertFileExists("public/s1/index.html", false)
 	b.AssertFileExists("public/s1/p1/index.html", false)
 }
+
+// Issue 12594.
+func TestCascadeOrder(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['rss','sitemap','taxonomy','term', 'home']
+-- content/_index.md --
+---
+title: Home
+cascade:
+- _target:
+    path: "**"
+  params:
+    background: yosemite.jpg
+- _target:
+  params:
+    background: goldenbridge.jpg
+---
+-- content/p1.md --
+---
+title: p1
+---
+-- layouts/_default/single.html --
+Background: {{ .Params.background }}|
+-- layouts/_default/list.html --
+{{ .Title }}|
+  `
+
+	for range 10 {
+		b := Test(t, files)
+		b.AssertFileContent("public/p1/index.html", "Background: yosemite.jpg")
+	}
+}
+
+// Issue #12465.
+func TestCascadeOverlap(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['home','rss','sitemap','taxonomy','term']
+-- layouts/_default/list.html --
+{{ .Title }}
+-- layouts/_default/single.html --
+{{ .Title }}
+-- content/s/_index.md --
+---
+title: s
+cascade:
+  _build:
+    render: never
+---
+-- content/s/p1.md --
+---
+title: p1
+---
+-- content/sx/_index.md --
+---
+title: sx
+---
+-- content/sx/p2.md --
+---
+title: p2
+---
+`
+
+	b := Test(t, files)
+
+	b.AssertFileExists("public/s/index.html", false)
+	b.AssertFileExists("public/s/p1/index.html", false)
+
+	b.AssertFileExists("public/sx/index.html", true)    // failing
+	b.AssertFileExists("public/sx/p2/index.html", true) // failing
+}

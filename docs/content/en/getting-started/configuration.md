@@ -7,8 +7,8 @@ keywords: [configuration,toml,yaml,json]
 menu:
   docs:
     parent: getting-started
-    weight: 40
-weight: 40
+    weight: 50
+weight: 50
 toc: true
 aliases: [/overview/source-directory/,/overview/configuration/]
 ---
@@ -61,9 +61,7 @@ See the specifications for each file format: [TOML], [YAML], and [JSON].
 
 ## Configuration directory
 
-Instead of a single site configuration file, split your configuration by [environment], root configuration key, and language. For example:
-
-[environment]: /getting-started/glossary/#environment
+Instead of a single site configuration file, split your configuration by [environment](g), root configuration key, and language. For example:
 
 ```text
 my-project/
@@ -138,7 +136,7 @@ ID = 'G-XXXXXXXXX'
 Now consider the following scenario:
 
 1. You don't want to load the analytics code when running `hugo server`.
-2. You want to use different Google tag IDs for your production and staging environments. For example:
+1. You want to use different Google tag IDs for your production and staging environments. For example:
 
     - `G-PPPPPPPPP` for production
     - `G-SSSSSSSSS` for staging
@@ -151,7 +149,7 @@ To satisfy these requirements, configure your site as follows:
 
     By default, Hugo sets its `environment` to `development` when running `hugo server`. In the absence of a `config/development` directory, Hugo uses the `config/_default` directory.
 
-2. `config/production/hugo.toml`
+1. `config/production/hugo.toml`
 
     Include this section only:
 
@@ -164,7 +162,7 @@ To satisfy these requirements, configure your site as follows:
 
     By default, Hugo sets its `environment` to `production` when running `hugo`. The analytics code will use the `G-PPPPPPPPP` tag ID.
 
-3. `config/staging/hugo.toml`
+1. `config/staging/hugo.toml`
 
     Include this section only:
 
@@ -230,13 +228,13 @@ See [Configure File Caches](#configure-file-caches).
 
 ###### canonifyURLs
 
-(`bool`) See [details](/content-management/urls/#canonical-urls) before enabling this feature. Default is `false`.
+(`bool`) See&nbsp;[details](/content-management/urls/#canonical-urls) before enabling this feature. Default is `false`.
 
 ###### capitalizeListTitles
 
-{{< new-in 0.123.3 >}}
+{{< new-in 0.123.3 />}}
 
-(`bool`) Whether to capitalize automatic list titles. Applicable to section, taxonomy, and term pages. Default is `true`. You can change the capitalization style in your site configuration to one of `ap`, `chicago`, `go`, `firstupper`, or `none`. See [details].
+(`bool`) Whether to capitalize automatic list titles. Applicable to section, taxonomy, and term pages. Default is `true`. You can change the capitalization style in your site configuration to one of `ap`, `chicago`, `go`, `firstupper`, or `none`. See&nbsp;[details].
 
 [details]: /getting-started/configuration/#configure-title-case
 
@@ -266,6 +264,9 @@ To remain consistent and prevent unexpected behavior, do not mix these strategie
 
 (`string`) The directory from where Hugo reads data files. Default is `data`. {{% module-mounts-note %}}
 
+###### defaultOutputFormat
+(`string`) The default output format for the site. If unspecified, the first available format in the defined order (by weight, then alphabetically) will be used.
+
 ###### defaultContentLanguage
 
 (`string`) Content without language indicator will default to this language. Default is `en`.
@@ -278,15 +279,19 @@ To remain consistent and prevent unexpected behavior, do not mix these strategie
 
 (`bool`) Will disable generation of alias redirects. Note that even if `disableAliases` is set, the aliases themselves are preserved on the page. The motivation with this is to be able to generate 301 redirects in an `.htaccess`, a Netlify `_redirects` file or similar using a custom output format. Default is `false`.
 
+###### disableDefaultLanguageRedirect
+
+{{< new-in 0.140.0 />}}
+
+(`bool`) Disables generation of redirect to the default language when DefaultContentLanguageInSubdir is `true`. Default is `false`.
+
 ###### disableHugoGeneratorInject
 
 (`bool`) Hugo will, by default, inject a generator meta tag in the HTML head on the _home page only_. You can turn it off, but we would really appreciate if you don't, as this is a good way to watch Hugo's popularity on the rise. Default is `false`.
 
 ###### disableKinds
 
-(`string slice`) Disable rendering of the specified page [kinds], any of `404`, `home`, `page`, `robotstxt`, `rss`, `section`, `sitemap`, `taxonomy`, or `term`.
-
-[kinds]: /getting-started/glossary/#page-kind
+(`[]string`) Disable rendering of the specified page [kinds](g), any of `404`, `home`, `page`, `robotstxt`, `rss`, `section`, `sitemap`, `taxonomy`, or `term`.
 
 ###### disableLanguages
 
@@ -332,7 +337,7 @@ See [Front matter Configuration](#configure-front-matter).
 (`bool`) Ignore the cache directory. Default is `false`.
 
 ###### ignoreLogs
-(`string slice`) A slice of message identifiers corresponding to warnings and errors you wish to suppress. See [`erroridf`] and [`warnidf`].
+(`[]string`) A slice of message identifiers corresponding to warnings and errors you wish to suppress. See [`erroridf`] and [`warnidf`].
 
 [`erroridf`]: /functions/fmt/erroridf/
 [`warnidf`]: /functions/fmt/warnidf/
@@ -439,7 +444,7 @@ See [Content Management](/content-management/urls/#permalinks).
 
 ###### publishDir
 
-(`string`) The directory to where Hugo will write the final static site (the HTML files etc.). Default is `public`.
+(`string`) The directory where Hugo will write the final static site (the HTML files etc.). Default is `public`.
 
 ###### refLinksErrorLevel
 
@@ -455,7 +460,7 @@ See [Related Content](/content-management/related/#configure-related-content).
 
 ###### relativeURLs
 
-(`bool`) See [details](/content-management/urls/#relative-urls) before enabling this feature. Default is `false`.
+(`bool`) See&nbsp;[details](/content-management/urls/#relative-urls) before enabling this feature. Default is `false`.
 
 ###### removePathAccents
 
@@ -467,9 +472,9 @@ content/post/hügó.md → https://example.org/post/hugo/
 
 ###### renderSegments
 
-{{< new-in 0.124.0 >}}
+{{< new-in 0.124.0 />}}
 
-(`string slice`) A list of segments to render. If not set, everything will be rendered. This is more commonly set in a CLI flag, e.g. `hugo --renderSegments segment1,segment2`. The segment names must match the names in the [segments](#configure-segments) configuration.
+(`[]string`) A list of segments to render. If not set, everything will be rendered. This is more commonly set in a CLI flag, e.g. `hugo --renderSegments segment1,segment2`. The segment names must match the names in the [segments](#configure-segments) configuration.
 
 ###### sectionPagesMenu
 
@@ -536,7 +541,7 @@ See [module configuration](/hugo-modules/configuration/#module-configuration-imp
 
 ###### uglyURLs
 
-(`bool` or `map`) Whether to generate uglyURLs. Default is `false`. See [details](/content-management/urls/#appearance).
+(`bool` or `map`) Whether to generate uglyURLs. Default is `false`. See&nbsp;[details](/content-management/urls/#appearance).
 
 ###### watch
 
@@ -558,7 +563,7 @@ enableemoji: true
 
 ## Configure page
 
-{{< new-in 0.133.0 >}}
+{{< new-in 0.133.0 />}}
 
 These methods on a `Page` object navigate to the next or previous page within a page collection, relative to the current page:
 
@@ -603,7 +608,6 @@ These settings do not apply to the [`Next`] or [`Prev`] methods on a `Pages` obj
 ## Configure build
 
 See [Configure Build](/getting-started/configuration-build/).
-
 
 ## Configure server
 
@@ -693,7 +697,6 @@ to = '/en/404.html'
 status = 404
 {{< /code-toggle >}}
 
-
 ## Configure title case
 
 By default, Hugo follows the capitalization rules published in the [Associated Press Stylebook] when creating automatic section titles, and when transforming strings with the [`strings.Title`] function.
@@ -726,14 +729,12 @@ DART_SASS_BINARY
 : (`string`) The absolute path to the Dart Sass executable. By default, Hugo searches for the executable in each of the paths in the `PATH` environment variable.
 
 HUGO_ENVIRONMENT
-: (`string`) Overrides the default [environment], typically one of `development`, `staging`, or `production`.
-
-[environment]: /getting-started/glossary/#environment
+: (`string`) Overrides the default [environment](g), typically one of `development`, `staging`, or `production`.
 
 HUGO_FILE_LOG_FORMAT
 : (`string`) A format string for the file path, line number, and column number displayed when reporting errors, or when calling the `Position` method from a shortcode or Markdown render hook. Valid tokens are `:file`, `:line`, and `:col`. Default is `:file::line::col`.
 
-{{< new-in 0.123.0 >}}
+{{< new-in 0.123.0 />}}
 
 HUGO_MEMORYLIMIT
 : (`int`) The maximum amount of system memory, in gigabytes, that Hugo can use while rendering your site. Default is 25% of total system memory.
@@ -875,7 +876,7 @@ This can be set using the `cacheDir` config option or via the OS environment var
 If this is not set, Hugo will use, in order of preference:
 
 1. If running on Netlify: `/opt/build/cache/hugo_cache/`. This means that if you run your builds on Netlify, all caches configured with `:cacheDir` will be saved and restored on the next build. For other CI vendors, please read their documentation. For an CircleCI example, see [this configuration](https://github.com/bep/hugo-sass-test/blob/6c3960a8f4b90e8938228688bc49bdcdd6b2d99e/.circleci/config.yml).
-1. In a `hugo_cache` directory below the OS user cache directory as defined by Go's [os.UserCacheDir](https://pkg.go.dev/os#UserCacheDir). On Unix systems, this is `$XDG_CACHE_HOME` as specified by [basedir-spec-latest](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) if non-empty, else `$HOME/.cache`. On MacOS, this is `$HOME/Library/Caches`. On Windows, this is`%LocalAppData%`. On Plan 9, this is `$home/lib/cache`. {{< new-in 0.116.0 >}}
+1. In a `hugo_cache` directory below the OS user cache directory as defined by Go's [os.UserCacheDir](https://pkg.go.dev/os#UserCacheDir). On Unix systems, this is `$XDG_CACHE_HOME` as specified by [basedir-spec-latest](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) if non-empty, else `$HOME/.cache`. On MacOS, this is `$HOME/Library/Caches`. On Windows, this is`%LocalAppData%`. On Plan 9, this is `$home/lib/cache`. {{< new-in 0.116.0 />}}
 1. In a  `hugo_cache_$USER` directory below the OS temp dir.
 
 If you want to know the current value of `cacheDir`, you can run `hugo config`, e.g: `hugo config | grep cachedir`.
@@ -887,10 +888,9 @@ If you want to know the current value of `cacheDir`, you can run `hugo config`, 
 [templates]: /templates/
 [static-files]: /content-management/static-files/
 
-
 ## Configure HTTP cache
 
-{{< new-in 0.127.0 >}}
+{{< new-in 0.127.0 />}}
 
 Note that this configuration is currently only relevant when using the [resources.GetRemote] function.
 
@@ -936,7 +936,7 @@ polling
 
 ## Configure segments
 
-{{< new-in 0.124.0 >}}
+{{< new-in 0.124.0 />}}
 
 {{% note %}}
 The `segments` configuration is currently only used to configure partitioned rendering.
@@ -957,10 +957,10 @@ lang
 : The [page language].
 
 kind
-: The [kind] of the page.
+: The [kind](g) of the page.
 
 output
-: The [output format] of the page.
+: The [output format](g) of the page.
 
 It is recommended to put coarse grained filters (e.g. for language and output format) in the excludes section, e.g.:
 
@@ -994,6 +994,3 @@ Some use cases for this feature:
   
 [path]: /methods/page/path/
 [page language]: /methods/page/language/
-[kind]: /getting-started/glossary/#page-kind
-[output format]: /getting-started/glossary/#output-format
-[type]: /getting-started/glossary/#content-type

@@ -91,7 +91,7 @@ func LoadConfig(d ConfigSourceDescriptor) (*Configs, error) {
 		return nil, fmt.Errorf("failed to init config: %w", err)
 	}
 
-	loggers.InitGlobalLogger(d.Logger.Level(), configs.Base.PanicOnWarning)
+	loggers.SetGlobalLogger(d.Logger)
 
 	return configs, nil
 }
@@ -305,7 +305,7 @@ func (l configLoader) applyOsEnvOverrides(environ []string) error {
 				_, ok := allDecoderSetups[key]
 				if ok {
 					// A map.
-					if v, err := metadecoders.Default.UnmarshalStringTo(env.Value, map[string]interface{}{}); err == nil {
+					if v, err := metadecoders.Default.UnmarshalStringTo(env.Value, map[string]any{}); err == nil {
 						val = v
 					}
 				}
@@ -470,7 +470,7 @@ func (l *configLoader) loadModules(configs *Configs, ignoreModuleDoesNotExist bo
 		ignoreVendor, _ = hglob.GetGlob(hglob.NormalizePath(s))
 	}
 
-	ex := hexec.New(conf.Security, workingDir)
+	ex := hexec.New(conf.Security, workingDir, l.Logger)
 
 	hook := func(m *modules.ModulesConfig) error {
 		for _, tc := range m.AllModules {

@@ -54,9 +54,7 @@ Although `style` is a global HTML attribute, when used in an info string it is a
 
 ## Context
 
-Code block render hook templates receive the following [context]:
-
-[context]: /getting-started/glossary/#context
+Code block render hook templates receive the following [context](g):
 
 ###### Attributes
 
@@ -80,7 +78,7 @@ Code block render hook templates receive the following [context]:
 
 ###### PageInner
 
-{{< new-in 0.125.0 >}}
+{{< new-in 0.125.0 />}}
 
 (`page`) A reference to a page nested via the [`RenderShortcodes`] method. [See details](#pageinner-details).
 

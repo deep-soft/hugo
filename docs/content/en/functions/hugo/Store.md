@@ -1,31 +1,28 @@
 ---
 title: hugo.Store
-description: Returns a global, persistent "scratch pad" to store and manipulate data.
+description: Returns a globally scoped "scratch pad" to store and manipulate data.
 categories: []
 keywords: []
 action:
   related:
-  - methods/page/store
-  - methods/site/store
-  - functions/collections/NewScratch
+    - methods/page/Store
+    - methods/site/Store
+    - methods/shortcode/Store
+    - functions/collections/NewScratch
   returnType: maps.Scratch
   signatures: [hugo.Store]
 toc: true
 ---
 
-{{< new-in 0.139.0 >}}
+{{< new-in 0.139.0 />}}
 
-The global `hugo.Store` function creates a persistent [scratch pad] to store and manipulate data. To create a locally scoped, use the [`newScratch`] function.
-
-[`Scratch`]: /functions/hugo/scratch/
-[`newScratch`]: /functions/collections/newscratch/
-[scratch pad]: /getting-started/glossary/#scratch-pad
+Use the `hugo.Store` function to create a globally scoped [scratch pad](g) to store and manipulate data. To create a scratch pad with a different [scope](g), refer to the [scope](#scope) section below.
 
 ## Methods
 
 ###### Set
 
-Sets the value of a given key.
+Sets the value of the given key.
 
 ```go-html-template
 {{ hugo.Store.Set "greeting" "Hello" }}
@@ -33,7 +30,7 @@ Sets the value of a given key.
 
 ###### Get
 
-Gets the value of a given key.
+Gets the value of the given key.
 
 ```go-html-template
 {{ hugo.Store.Set "greeting" "Hello" }}
@@ -42,7 +39,7 @@ Gets the value of a given key.
 
 ###### Add
 
-Adds a given value to existing value(s) of the given key.
+Adds the given value to the existing value(s) of the given key.
 
 For single values, `Add` accepts values that support Go's `+` operator. If the first `Add` for a key is an array or slice, the following adds will be appended to that list.
 
@@ -104,13 +101,13 @@ Removes the given key.
 {{ hugo.Store.Delete "greeting" }}
 ```
 
+{{% include "_common/scratch-pad-scope.md" %}}
+
 ## Determinate values
 
 The `Store` method is often used to set scratch pad values within a shortcode, a partial template called by a shortcode, or by a Markdown render hook. In all three cases, the scratch pad values are indeterminate until Hugo renders the page content.
 
-If you need to access a scratch pad value from a parent template, and the parent template has not yet rendered the page content, you can trigger content rendering by assigning the returned value to a [noop] variable:
-
-[noop]: /getting-started/glossary/#noop
+If you need to access a scratch pad value from a parent template, and the parent template has not yet rendered the page content, you can trigger content rendering by assigning the returned value to a [noop](g) variable:
 
 ```go-html-template
 {{ $noop := .Content }}

@@ -19,7 +19,7 @@ toc: true
 
 The `InSection` method on a `Page` object reports whether the given page is in the given section. Note that the method returns `true` when comparing a page to a sibling.
 
-{{% include "methods/page/_common/definition-of-section.md" %}}
+{{% glossary-term section %}}
 
 With this content structure:
 
@@ -73,7 +73,7 @@ In the examples above we are coding defensively using the [`with`] statement, re
 
 ## Understanding context
 
-Inside of the `with` block, the [context] (the dot) is the section `Page` object, not the `Page` object passed into the template. If we were to use this syntax:
+Inside of the `with` block, the [context](g) (the dot) is the section `Page` object, not the `Page` object passed into the template. If we were to use this syntax:
 
 ```go-html-template
 {{ with .Site.GetPage "/auctions" }}
@@ -97,6 +97,5 @@ Use the `$` to get the context passed into the template.
 Gaining a thorough understanding of context is critical for anyone writing template code.
 {{% /note %}}
 
-[context]: /getting-started/glossary/#context
 [`with`]: /functions/go-template/with/
 [`else`]: /functions/go-template/else/

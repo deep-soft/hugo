@@ -224,9 +224,6 @@ type resourceCopier interface {
 
 // Copy copies r to the targetPath given.
 func Copy(r resource.Resource, targetPath string) resource.Resource {
-	if r.Err() != nil {
-		panic(fmt.Sprintf("Resource has an .Err: %s", r.Err()))
-	}
 	return r.(resourceCopier).cloneTo(targetPath)
 }
 
@@ -366,6 +363,7 @@ type genericResource struct {
 	sd    ResourceSourceDescriptor
 	paths internal.ResourcePaths
 
+	includeHashInKey     bool
 	sourceFilenameIsHash bool
 
 	h *resourceHash // A hash of the source content. Is only calculated in caching situations.
@@ -439,10 +437,6 @@ func (l *genericResource) Content(context.Context) (any, error) {
 	return hugio.ReadString(r)
 }
 
-func (r *genericResource) Err() resource.ResourceError {
-	return nil
-}
-
 func (l *genericResource) Data() any {
 	return l.sd.Data
 }
@@ -458,6 +452,10 @@ func (l *genericResource) Key() string {
 
 		if l.spec.Cfg.IsMultihost() {
 			l.key = l.spec.Lang() + l.key
+		}
+
+		if l.includeHashInKey && !l.sourceFilenameIsHash {
+			l.key += fmt.Sprintf("_%d", l.hash())
 		}
 	})
 

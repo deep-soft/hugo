@@ -6,8 +6,8 @@ keywords: [markup,markdown,goldmark,asciidoc,asciidoctor,highlighting]
 menu:
   docs:
     parent: getting-started
-    weight: 50
-weight: 50
+    weight: 60
+weight: 60
 slug: configuration-markup
 toc: true
 ---
@@ -86,7 +86,7 @@ typographer|[Goldmark Extensions: Typographer]|:heavy_check_mark:
 
 #### Extras
 
-{{< new-in 0.126.0 >}}
+{{< new-in 0.126.0 />}}
 
 Enable [deleted text], [inserted text], [mark text], [subscript], and [superscript] elements in Markdown.
 
@@ -107,7 +107,7 @@ Superscript|`1^st^`|`1<sup>st</sup>`
 To avoid a conflict when enabling the Hugo Goldmark Extras subscript extension, if you want to render subscript and strikethrough text concurrently you must:
 
 1. Disable the Goldmark strikethrough extension
-2. Enable the Hugo Goldmark Extras delete extension
+1. Enable the Hugo Goldmark Extras delete extension
 
 For example:
 
@@ -124,9 +124,9 @@ enable = true
 
 #### Passthrough
 
-{{< new-in 0.122.0 >}}
+{{< new-in 0.122.0 />}}
 
-Enable the passthrough extension to include mathematical equations and expressions in Markdown using LaTeX or TeX typesetting syntax. See [mathematics in Markdown] for details.
+Enable the passthrough extension to include mathematical equations and expressions in Markdown using LaTeX markup. See [mathematics in Markdown] for details.
 
 [mathematics in Markdown]: content-management/mathematics/
 
@@ -153,7 +153,7 @@ Most of the Goldmark settings above are self-explanatory, but some require expla
 
 ###### duplicateResourceFiles
 
-{{< new-in 0.123.0 >}}
+{{< new-in 0.123.0 />}}
 
 (`bool`) If `true`, shared page resources on multilingual single-host sites will be duplicated for each language. See [multilingual page resources] for details. Default is `false`.
 
@@ -194,7 +194,7 @@ This is also the strategy used by the [anchorize](/functions/urls/anchorize) tem
 
 ###### renderHooks.image.enableDefault
 
-{{< new-in 0.123.0 >}}
+{{< new-in 0.123.0 />}}
 
 (`bool`) If `true`, enables Hugo's [embedded image render hook]. Default is `false`.
 
@@ -208,7 +208,7 @@ The embedded image render hook is automatically enabled for multilingual single-
 
 ###### renderHooks.link.enableDefault
 
-{{< new-in 0.123.0 >}}
+{{< new-in 0.123.0 />}}
 
 (`bool`) If `true`, enables Hugo's [embedded link render hook]. Default is `false`.
 

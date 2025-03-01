@@ -22,6 +22,7 @@ proxy = 'direct'
 replacements = ''
 vendorClosest = false
 workspace = 'off'
+auth = ''
 {{< /code-toggle >}}
 
 noProxy
@@ -35,6 +36,9 @@ private
 
 proxy
 : (`string`) Defines the proxy server to use to download remote modules. Default is `direct`, which means "git clone" and similar.
+
+auth
+: (`string`)  {{< new-in 0.144.0 >}} Configures `GOAUTH` when running the Go command for module operations. This is a semicolon-separated list of authentication commands for go-import and HTTPS module mirror interactions. This is useful for private repositories. See `go help goauth` for more information.
 
 vendorClosest
 : (`bool`) When enabled, we will pick the vendored module closest to the module using it. The default behavior is to pick the first. Note that there can still be only one dependency of a given module path, so once it is in use it cannot be redefined. Default is `false`.
@@ -75,7 +79,7 @@ max
 : (`string`) The maximum Hugo version supported, e.g. `0.55.0`
 
 extended
-: (`bool`) Whether the extended version of Hugo is required.
+: (`bool`) Whether the extended edition of Hugo is required, satisfied by installing either the extended or extended/deploy edition.
 
 ## Module configuration: imports
 
@@ -91,7 +95,7 @@ extended
 {{< /code-toggle >}}
 
 path
-: Can be either a valid Go Module module path, e.g. `github.com/gohugoio/myShortcodes`, or the directory name for the module as stored in your themes folder.
+: Can be either a valid Go Module module path, e.g. `github.com/gohugoio/myShortcodes`, or the directory name for the module as stored in your `themes` directory.
 
 ignoreConfig
 : If enabled, any module configuration file, e.g. `hugo.toml`, will not be loaded. Note that this will also stop the loading of any transitive module dependencies.
@@ -103,7 +107,7 @@ disable
 : Set to `true` to disable the module while keeping any version info in the `go.*` files.
 
 noMounts
-:  Do not mount any folder in this import.
+:  Do not mount any directory in this import.
 
 noVendor
 :  Never vendor this import (only allowed in main project).
@@ -151,24 +155,24 @@ source
 : (`string`) The source directory of the mount. For the main project, this can be either project-relative or absolute. For other modules it must be project-relative.
 
 target
-: (`string`) Where it should be mounted into Hugo's virtual filesystem. It must start with one of Hugo's component folders: `static`, `content`, `layouts`, `data`, `assets`, `i18n`, or `archetypes`. E.g. `content/blog`.
+: (`string`) Where it should be mounted into Hugo's virtual filesystem. It must start with one of Hugo's component directories: `static`, `content`, `layouts`, `data`, `assets`, `i18n`, or `archetypes`. E.g. `content/blog`.
 
 disableWatch
-{{< new-in 0.128.0 >}}
+{{< new-in 0.128.0 />}}
 : (`bool`) Whether to disable watching in watch mode for this mount. Default is `false`.
 
 lang
 : (`string`) The language code, e.g. "en". Only relevant for `content` mounts, and `static` mounts when in multihost mode.
 
 includeFiles
-: (`string` or `string slice`) One or more [glob](https://github.com/gobwas/glob) patterns matching files or directories to include. If `excludeFiles` is not set, the files matching `includeFiles` will be the files mounted.
+: (`string` or `[]string`) One or more [glob](https://github.com/gobwas/glob) patterns matching files or directories to include. If `excludeFiles` is not set, the files matching `includeFiles` will be the files mounted.
 
 The glob patterns are matched to the file names starting from the `source` root, they should have Unix styled slashes even on Windows, `/` matches the mount root and `**` can be used as a  super-asterisk to match recursively down all directories, e.g `/posts/**.jpg`.
 
 The search is case-insensitive.
 
 excludeFiles
-: (`string` or `string slice`) One or more glob patterns matching files to exclude.
+: (`string` or `[]string`) One or more glob patterns matching files to exclude.
 
 ### Example
 

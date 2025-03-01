@@ -82,7 +82,7 @@ func init() {
 	}
 	configLanguageKeys = make(map[string]bool)
 	addKeys := func(v reflect.Value) {
-		for i := 0; i < v.NumField(); i++ {
+		for i := range v.NumField() {
 			name := strings.ToLower(v.Type().Field(i).Name)
 			if skip[name] {
 				continue
@@ -128,6 +128,9 @@ type Config struct {
 	// <docsmeta>{"identifiers": ["markup"] }</docsmeta>
 	Markup markup_config.Config `mapstructure:"-"`
 
+	// ContentTypes are the media types that's considered content in Hugo.
+	ContentTypes *config.ConfigNamespace[map[string]media.ContentTypeConfig, media.ContentTypes] `mapstructure:"-"`
+
 	// The mediatypes configuration section maps the MIME type (a string) to a configuration object for that type.
 	// <docsmeta>{"identifiers": ["mediatypes"], "refs": ["types:media:type"] }</docsmeta>
 	MediaTypes *config.ConfigNamespace[map[string]media.MediaTypeConfig, media.Types] `mapstructure:"-"`
@@ -143,7 +146,7 @@ type Config struct {
 
 	// The cascade configuration section contains the top level front matter cascade configuration options,
 	// a slice of page matcher and params to apply to those pages.
-	Cascade *config.ConfigNamespace[[]page.PageMatcherParamsConfig, map[page.PageMatcher]maps.Params] `mapstructure:"-"`
+	Cascade *config.ConfigNamespace[[]page.PageMatcherParamsConfig, *maps.Ordered[page.PageMatcher, maps.Params]] `mapstructure:"-"`
 
 	// The segments defines segments for the site. Used for partial/segmented builds.
 	Segments *config.ConfigNamespace[map[string]segments.SegmentConfig, segments.Segments] `mapstructure:"-"`
@@ -301,6 +304,18 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 		}
 	}
 
+	defaultOutputFormat := outputFormats[0]
+	c.DefaultOutputFormat = strings.ToLower(c.DefaultOutputFormat)
+	if c.DefaultOutputFormat != "" {
+		f, found := outputFormats.GetByName(c.DefaultOutputFormat)
+		if !found {
+			return fmt.Errorf("unknown default output format %q", c.DefaultOutputFormat)
+		}
+		defaultOutputFormat = f
+	} else {
+		c.DefaultOutputFormat = defaultOutputFormat.Name
+	}
+
 	disabledLangs := make(map[string]bool)
 	for _, lang := range c.DisableLanguages {
 		disabledLangs[lang] = true
@@ -390,23 +405,54 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 		c.Pagination.Path = c.PaginatePath
 	}
 
+	// Legacy privacy values.
+	if c.Privacy.Twitter.Disable {
+		hugo.Deprecate("site config key privacy.twitter.disable", "Use privacy.x.disable instead.", "v0.141.0")
+		c.Privacy.X.Disable = c.Privacy.Twitter.Disable
+	}
+
+	if c.Privacy.Twitter.EnableDNT {
+		hugo.Deprecate("site config key privacy.twitter.enableDNT", "Use privacy.x.enableDNT instead.", "v0.141.0")
+		c.Privacy.X.EnableDNT = c.Privacy.Twitter.EnableDNT
+	}
+
+	if c.Privacy.Twitter.Simple {
+		hugo.Deprecate("site config key privacy.twitter.simple", "Use privacy.x.simple instead.", "v0.141.0")
+		c.Privacy.X.Simple = c.Privacy.Twitter.Simple
+	}
+
+	// Legacy services values.
+	if c.Services.Twitter.DisableInlineCSS {
+		hugo.Deprecate("site config key services.twitter.disableInlineCSS", "Use services.x.disableInlineCSS instead.", "v0.141.0")
+		c.Services.X.DisableInlineCSS = c.Services.Twitter.DisableInlineCSS
+	}
+
+	// Legacy permalink tokens
+	vs := fmt.Sprintf("%v", c.Permalinks)
+	if strings.Contains(vs, ":filename") {
+		hugo.Deprecate("the \":filename\" permalink token", "Use \":contentbasename\" instead.", "0.144.0")
+	}
+	if strings.Contains(vs, ":slugorfilename") {
+		hugo.Deprecate("the \":slugorfilename\" permalink token", "Use \":slugorcontentbasename\" instead.", "0.144.0")
+	}
+
 	c.C = &ConfigCompiled{
-		Timeout:           timeout,
-		BaseURL:           baseURL,
-		BaseURLLiveReload: baseURL,
-		DisabledKinds:     disabledKinds,
-		DisabledLanguages: disabledLangs,
-		IgnoredLogs:       ignoredLogIDs,
-		KindOutputFormats: kindOutputFormats,
-		ContentTypes:      media.DefaultContentTypes.FromTypes(c.MediaTypes.Config),
-		CreateTitle:       helpers.GetTitleFunc(c.TitleCaseStyle),
-		IsUglyURLSection:  isUglyURL,
-		IgnoreFile:        ignoreFile,
-		SegmentFilter:     c.Segments.Config.Get(func(s string) { logger.Warnf("Render segment %q not found in configuration", s) }, c.RootConfig.RenderSegments...),
-		MainSections:      c.MainSections,
-		Clock:             clock,
-		HTTPCache:         httpCache,
-		transientErr:      transientErr,
+		Timeout:             timeout,
+		BaseURL:             baseURL,
+		BaseURLLiveReload:   baseURL,
+		DisabledKinds:       disabledKinds,
+		DisabledLanguages:   disabledLangs,
+		IgnoredLogs:         ignoredLogIDs,
+		KindOutputFormats:   kindOutputFormats,
+		DefaultOutputFormat: defaultOutputFormat,
+		CreateTitle:         helpers.GetTitleFunc(c.TitleCaseStyle),
+		IsUglyURLSection:    isUglyURL,
+		IgnoreFile:          ignoreFile,
+		SegmentFilter:       c.Segments.Config.Get(func(s string) { logger.Warnf("Render segment %q not found in configuration", s) }, c.RootConfig.RenderSegments...),
+		MainSections:        c.MainSections,
+		Clock:               clock,
+		HTTPCache:           httpCache,
+		transientErr:        transientErr,
 	}
 
 	for _, s := range allDecoderSetups {
@@ -430,22 +476,22 @@ func (c *Config) IsLangDisabled(lang string) bool {
 
 // ConfigCompiled holds values and functions that are derived from the config.
 type ConfigCompiled struct {
-	Timeout           time.Duration
-	BaseURL           urls.BaseURL
-	BaseURLLiveReload urls.BaseURL
-	ServerInterface   string
-	KindOutputFormats map[string]output.Formats
-	ContentTypes      media.ContentTypes
-	DisabledKinds     map[string]bool
-	DisabledLanguages map[string]bool
-	IgnoredLogs       map[string]bool
-	CreateTitle       func(s string) string
-	IsUglyURLSection  func(section string) bool
-	IgnoreFile        func(filename string) bool
-	SegmentFilter     segments.SegmentFilter
-	MainSections      []string
-	Clock             time.Time
-	HTTPCache         httpcache.ConfigCompiled
+	Timeout             time.Duration
+	BaseURL             urls.BaseURL
+	BaseURLLiveReload   urls.BaseURL
+	ServerInterface     string
+	KindOutputFormats   map[string]output.Formats
+	DefaultOutputFormat output.Format
+	DisabledKinds       map[string]bool
+	DisabledLanguages   map[string]bool
+	IgnoredLogs         map[string]bool
+	CreateTitle         func(s string) string
+	IsUglyURLSection    func(section string) bool
+	IgnoreFile          func(filename string) bool
+	SegmentFilter       segments.SegmentFilter
+	MainSections        []string
+	Clock               time.Time
+	HTTPCache           httpcache.ConfigCompiled
 
 	// This is set to the last transient error found during config compilation.
 	// With themes/modules we compute the configuration in multiple passes, and
@@ -504,6 +550,10 @@ type RootConfig struct {
 	// By default, we put the default content language in the root and the others below their language ID, e.g. /no/.
 	// Set this to true to put all languages below their language ID.
 	DefaultContentLanguageInSubdir bool
+
+	// The default output format to use for the site.
+	// If not set, we will use the first output format.
+	DefaultOutputFormat string
 
 	// Disable generation of redirect to the default language when DefaultContentLanguageInSubdir is enabled.
 	DisableDefaultLanguageRedirect bool
@@ -726,15 +776,16 @@ type Configs struct {
 }
 
 func (c *Configs) Validate(logger loggers.Logger) error {
-	for p := range c.Base.Cascade.Config {
+	c.Base.Cascade.Config.Range(func(p page.PageMatcher, params maps.Params) bool {
 		page.CheckCascadePattern(logger, p)
-	}
+		return true
+	})
 	return nil
 }
 
 // transientErr returns the last transient error found during config compilation.
 func (c *Configs) transientErr() error {
-	for _, l := range c.LanguageConfigSlice {
+	for _, l := range c.LanguageConfigMap {
 		if l.C.transientErr != nil {
 			return l.C.transientErr
 		}
@@ -751,7 +802,6 @@ func (c *Configs) Init() error {
 	var languages langs.Languages
 	defaultContentLanguage := c.Base.DefaultContentLanguage
 	for k, v := range c.LanguageConfigMap {
-		c.LanguageConfigSlice = append(c.LanguageConfigSlice, v)
 		languageConf := v.Languages[k]
 		language, err := langs.NewLanguage(k, defaultContentLanguage, v.TimeZone, languageConf)
 		if err != nil {
@@ -799,7 +849,7 @@ func (c *Configs) Init() error {
 	c.Languages = languages
 	c.LanguagesDefaultFirst = languagesDefaultFirst
 
-	c.ContentPathParser = &paths.PathParser{LanguageIndex: languagesDefaultFirst.AsIndexSet(), IsLangDisabled: c.Base.IsLangDisabled, IsContentExt: c.Base.C.ContentTypes.IsContentSuffix}
+	c.ContentPathParser = &paths.PathParser{LanguageIndex: languagesDefaultFirst.AsIndexSet(), IsLangDisabled: c.Base.IsLangDisabled, IsContentExt: c.Base.ContentTypes.Config.IsContentSuffix}
 
 	c.configLangs = make([]config.AllProvider, len(c.Languages))
 	for i, l := range c.LanguagesDefaultFirst {

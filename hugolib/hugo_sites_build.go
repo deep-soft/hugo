@@ -170,18 +170,24 @@ func (h *HugoSites) Build(config BuildCfg, events ...fsnotify.Event) error {
 			h.SendError(fmt.Errorf("render: %w", err))
 		}
 
-		if err := h.postRenderOnce(); err != nil {
-			h.SendError(fmt.Errorf("postRenderOnce: %w", err))
-		}
-
 		// Make sure to write any build stats to disk first so it's available
 		// to the post processors.
 		if err := h.writeBuildStats(); err != nil {
 			return err
 		}
 
+		// We need to do this before render deferred.
+		if err := h.printPathWarningsOnce(); err != nil {
+			h.SendError(fmt.Errorf("printPathWarnings: %w", err))
+		}
+
 		if err := h.renderDeferred(infol); err != nil {
 			h.SendError(fmt.Errorf("renderDeferred: %w", err))
+		}
+
+		// This needs to be done after the deferred rendering to get complete template usage coverage.
+		if err := h.printUnusedTemplatesOnce(); err != nil {
+			h.SendError(fmt.Errorf("printPathWarnings: %w", err))
 		}
 
 		if err := h.postProcess(infol); err != nil {
@@ -341,7 +347,23 @@ func (h *HugoSites) render(l logg.LevelLogger, config *BuildCfg) error {
 		loggers.TimeTrackf(l, start, h.buildCounters.loggFields(), "")
 	}()
 
-	siteRenderContext := &siteRenderContext{cfg: config, multihost: h.Configs.IsMultihost}
+	siteRenderContext := &siteRenderContext{cfg: config, infol: l, multihost: h.Configs.IsMultihost}
+
+	renderErr := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		// In Hugo 0.141.0 we replaced the special error handling for resources.GetRemote
+		// with the more general try.
+		if strings.Contains(err.Error(), "can't evaluate field Err in type") {
+			if strings.Contains(err.Error(), "resource.Resource") {
+				return fmt.Errorf("%s: Resource.Err was removed in Hugo v0.141.0 and replaced with a new try keyword, see https://gohugo.io/functions/go-template/try/", err)
+			} else if strings.Contains(err.Error(), "template.HTML") {
+				return fmt.Errorf("%s: the return type of transform.ToMath was changed in Hugo v0.141.0 and the error handling replaced with a new try keyword, see https://gohugo.io/functions/go-template/try/", err)
+			}
+		}
+		return err
+	}
 
 	i := 0
 	for _, s := range h.Sites {
@@ -390,7 +412,7 @@ func (h *HugoSites) render(l logg.LevelLogger, config *BuildCfg) error {
 							}
 						} else {
 							if err := s.render(siteRenderContext); err != nil {
-								return err
+								return renderErr(err)
 							}
 						}
 						loggers.TimeTrackf(ll, start, nil, "")
@@ -496,6 +518,7 @@ func (s *Site) executeDeferredTemplates(de *deps.DeferredExecutions) error {
 				}
 
 				content = append(content[:low], append([]byte(deferred.Result), content[high:]...)...)
+				forward = len(deferred.Result)
 				changed = true
 
 				return nil
@@ -528,9 +551,9 @@ func (s *Site) executeDeferredTemplates(de *deps.DeferredExecutions) error {
 	return g.Wait()
 }
 
-// / postRenderOnce runs some post processing that only needs to be done once, e.g. printing of unused templates.
-func (h *HugoSites) postRenderOnce() error {
-	h.postRenderInit.Do(func() {
+// printPathWarningsOnce prints path warnings if enabled.
+func (h *HugoSites) printPathWarningsOnce() error {
+	h.printPathWarningsInit.Do(func() {
 		conf := h.Configs.Base
 		if conf.PrintPathWarnings {
 			// We need to do this before any post processing, as that may write to the same files twice
@@ -545,7 +568,14 @@ func (h *HugoSites) postRenderOnce() error {
 				return false
 			})
 		}
+	})
+	return nil
+}
 
+// / printUnusedTemplatesOnce prints unused templates if enabled.
+func (h *HugoSites) printUnusedTemplatesOnce() error {
+	h.printUnusedTemplatesInit.Do(func() {
+		conf := h.Configs.Base
 		if conf.PrintUnusedTemplates {
 			unusedTemplates := h.Tmpl().(tpl.UnusedTemplatesProvider).UnusedTemplates()
 			for _, unusedTemplate := range unusedTemplates {
@@ -810,6 +840,11 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 		addedContentPaths []*paths.Path
 	)
 
+	var (
+		addedOrChangedContent []pathChange
+		changes               []identity.Identity
+	)
+
 	for _, ev := range eventInfos {
 		cpss := h.BaseFs.ResolvePaths(ev.Name)
 		pss := make([]*paths.Path, len(cpss))
@@ -836,6 +871,13 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 			if err == nil && g != nil {
 				cacheBusters = append(cacheBusters, g)
 			}
+
+			if ev.added {
+				changes = append(changes, identity.StructuralChangeAdd)
+			}
+			if ev.removed {
+				changes = append(changes, identity.StructuralChangeRemove)
+			}
 		}
 
 		if ev.removed {
@@ -846,11 +888,6 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 			changedPaths.changedFiles = append(changedPaths.changedFiles, pss...)
 		}
 	}
-
-	var (
-		addedOrChangedContent []pathChange
-		changes               []identity.Identity
-	)
 
 	// Find the most specific identity possible.
 	handleChange := func(pathInfo *paths.Path, delete, isDir bool) {
@@ -885,12 +922,12 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 
 			needsPagesAssemble = true
 
-			if config.RecentlyVisited != nil {
+			if config.RecentlyTouched != nil {
 				// Fast render mode. Adding them to the visited queue
 				// avoids rerendering them on navigation.
 				for _, id := range changes {
 					if p, ok := id.(page.Page); ok {
-						config.RecentlyVisited.Add(p.RelPermalink())
+						config.RecentlyTouched.Add(p.RelPermalink())
 					}
 				}
 			}

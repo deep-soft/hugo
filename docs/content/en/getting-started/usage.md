@@ -53,7 +53,7 @@ The [`hugo`] command builds your site, publishing the files to the `public` dire
 {{% note %}}
 Hugo does not clear the `public` directory before building your site. Existing files are overwritten, but not deleted. This behavior is intentional to prevent the inadvertent removal of files that you may have added to the `public` directory after the build.
 
-Depending on your needs, you may wish to manually clear the contents of the public directory before every build.
+Depending on your needs, you may wish to manually clear the contents of the `public` directory before every build.
 {{% /note %}}
 
 ## Draft, future, and expired content
@@ -65,14 +65,13 @@ Hugo allows you to set `draft`, `date`, `publishDate`, and `expiryDate` in the [
 - The `publishDate` is in the future
 - The `expiryDate` is in the past
 
-{{< new-in 0.123.0 >}}
+{{< new-in 0.123.0 />}}
 
 {{% note %}}
-Hugo publishes descendants of draft, future, and expired [node] pages. To prevent publication of these descendants, use the [`cascade`] front matter field to cascade [build options] to the descendant pages.
+Hugo publishes descendants of draft, future, and expired [node](g) pages. To prevent publication of these descendants, use the [`cascade`] front matter field to cascade [build options] to the descendant pages.
 
 [build options]: /content-management/build-options/
 [`cascade`]: /content-management/front-matter/#cascade-field
-[node]: /getting-started/glossary/#node
 {{% /note %}}
 
 You can override the default behavior when running `hugo` or `hugo server` with command line flags:
@@ -99,7 +98,7 @@ To view your site while developing layouts or creating content, `cd` into your p
 hugo server
 ```
 
-The [`hugo server`] command builds your site into memory, and serves your pages using a minimal HTTP server. When you run `hugo server` it will display the URL of your local site:
+The [`hugo server`] command builds your site and serves your pages using a minimal HTTP server. When you run `hugo server` it will display the URL of your local site:
 
 ```text
 Web Server is available at http://localhost:1313/ 
@@ -124,7 +123,7 @@ hugo server --navigateToChanged
 ## Deploy your site
 
 {{% note %}}
-As noted above, Hugo does not clear the public directory before building your site. Manually clear the contents of the public directory before each build to remove draft, expired, and future content.
+As noted above, Hugo does not clear the `public` directory before building your site. Manually clear the contents of the `public` directory before each build to remove draft, expired, and future content.
 {{% /note %}}
 
 When you are ready to deploy your site, run:
@@ -133,7 +132,7 @@ When you are ready to deploy your site, run:
 hugo
 ```
 
-This builds your site, publishing the files to the public directory. The directory structure will look something like this:
+This builds your site, publishing the files to the `public` directory. The directory structure will look something like this:
 
 ```text
 public/
@@ -159,7 +158,7 @@ Most of our users deploy their sites using a CI/CD workflow, where a push[^1] to
 
 Learn more in the [hosting and deployment] section.
 
-[^1]: The Git repository contains the entire project directory, typically excluding the public directory because the site is built _after_ the push.
+[^1]: The Git repository contains the entire project directory, typically excluding the `public` directory because the site is built _after_ the push.
 
 [`--destination`]: /commands/hugo/#options
 [`hugo server`]: /commands/hugo_server/

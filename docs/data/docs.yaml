@@ -55,6 +55,9 @@ chroma:
     - armasm
     Name: ArmAsm
   - Aliases:
+    - atl
+    Name: ATL
+  - Aliases:
     - autohotkey
     - ahk
     Name: AutoHotkey
@@ -88,6 +91,9 @@ chroma:
     - dosbatch
     - winbatch
     Name: Batchfile
+  - Aliases:
+    - beef
+    Name: Beef
   - Aliases:
     - bib
     - bibtex
@@ -190,6 +196,9 @@ chroma:
   - Aliases:
     - css
     Name: CSS
+  - Aliases:
+    - csv
+    Name: CSV
   - Aliases:
     - cue
     Name: CUE
@@ -308,7 +317,7 @@ chroma:
     - Gherkin
     Name: Gherkin
   - Aliases:
-    - gleam>
+    - gleam
     Name: Gleam
   - Aliases:
     - glsl
@@ -415,6 +424,12 @@ chroma:
     - json
     Name: JSON
   - Aliases:
+    - jsonata
+    Name: JSONata
+  - Aliases:
+    - jsonnet
+    Name: Jsonnet
+  - Aliases:
     - julia
     - jl
     Name: Julia
@@ -464,7 +479,8 @@ chroma:
     Name: Matlab
   - Aliases:
     - mcfunction
-    Name: mcfunction
+    - mcf
+    Name: MCFunction
   - Aliases:
     - meson
     - meson.build
@@ -521,6 +537,11 @@ chroma:
     - nixos
     - nix
     Name: Nix
+  - Aliases:
+    - nsis
+    - nsi
+    - nsh
+    Name: NSIS
   - Aliases:
     - objective-c
     - objectivec
@@ -753,6 +774,9 @@ chroma:
     - smarty
     Name: Smarty
   - Aliases:
+    - snbt
+    Name: SNBT
+  - Aliases:
     - snobol
     Name: Snobol
   - Aliases:
@@ -862,6 +886,9 @@ chroma:
   - Aliases:
     - typoscripthtmldata
     Name: TypoScriptHtmlData
+  - Aliases:
+    - typst
+    Name: Typst
   - Aliases: null
     Name: ucode
   - Aliases:
@@ -905,6 +932,9 @@ chroma:
     - wgsl
     Name: WebGPU Shading Language
   - Aliases:
+    - vtt
+    Name: WebVTT
+  - Aliases:
     - whiley
     Name: Whiley
   - Aliases:
@@ -928,6 +958,73 @@ chroma:
   - Aliases:
     - zig
     Name: Zig
+  styles:
+  - abap
+  - algol
+  - algol_nu
+  - arduino
+  - autumn
+  - average
+  - base16-snazzy
+  - borland
+  - bw
+  - catppuccin-frappe
+  - catppuccin-latte
+  - catppuccin-macchiato
+  - catppuccin-mocha
+  - colorful
+  - doom-one
+  - doom-one2
+  - dracula
+  - emacs
+  - evergarden
+  - friendly
+  - fruity
+  - github
+  - github-dark
+  - gruvbox
+  - gruvbox-light
+  - hr_high_contrast
+  - hrdark
+  - igor
+  - lovelace
+  - manni
+  - modus-operandi
+  - modus-vivendi
+  - monokai
+  - monokailight
+  - murphy
+  - native
+  - nord
+  - nordic
+  - onedark
+  - onesenterprise
+  - paraiso-dark
+  - paraiso-light
+  - pastie
+  - perldoc
+  - pygments
+  - rainbow_dash
+  - rose-pine
+  - rose-pine-dawn
+  - rose-pine-moon
+  - rrt
+  - solarized-dark
+  - solarized-dark256
+  - solarized-light
+  - swapoff
+  - tango
+  - tokyonight-day
+  - tokyonight-moon
+  - tokyonight-night
+  - tokyonight-storm
+  - trac
+  - vim
+  - vs
+  - vulcan
+  - witchhazel
+  - xcode
+  - xcode-dark
 config:
   HTTPCache:
     cache:
@@ -993,6 +1090,7 @@ config:
   dataDir: data
   defaultContentLanguage: en
   defaultContentLanguageInSubdir: false
+  defaultOutputFormat: html
   deployment:
     confirm: false
     dryRun: false
@@ -1005,6 +1103,7 @@ config:
     targets: null
     workers: 10
   disableAliases: false
+  disableDefaultLanguageRedirect: false
   disableHugoGeneratorInject: false
   disableKinds: null
   disableLanguages: null
@@ -1145,9 +1244,9 @@ config:
       lineNos: false
       lineNumbersInTable: true
       noClasses: true
-      noHl: false
       style: monokai
       tabWidth: 4
+      wrapperClass: highlight
     tableOfContents:
       endLevel: 3
       ordered: false
@@ -1637,6 +1736,10 @@ config:
       disable: false
       enableDNT: false
       simple: false
+    x:
+      disable: false
+      enableDNT: false
+      simple: false
     youTube:
       disable: false
       privacyEnhanced: false
@@ -1701,7 +1804,9 @@ config:
     headers: null
     redirects:
     - force: false
-      from: '**'
+      from: /**
+      fromHeaders: null
+      fromRe: ""
       status: 404
       to: /404.html
   services:
@@ -1715,6 +1820,8 @@ config:
     rss:
       limit: -1
     twitter:
+      disableInlineCSS: false
+    x:
       disableInlineCSS: false
   sitemap:
     changeFreq: ""
@@ -2560,8 +2667,9 @@ tpl:
         - querify
         Args:
         - params
-        Description: Querify encodes the given params in URL-encoded form ("bar=baz&foo=quux")
-          sorted by key.
+        Description: |-
+          Querify returns a URL query string composed of the given key-value pairs,
+          encoded and sorted by key.
         Examples:
         - - '{{ (querify "foo" 1 "bar" 2 "baz" "with spaces" "qux" "this&that=those")
             | safeHTML }}'
@@ -3193,6 +3301,11 @@ tpl:
         Args: null
         Description: ""
         Examples: null
+      Mask:
+        Aliases: null
+        Args: null
+        Description: ""
+        Examples: null
       Opacity:
         Aliases: null
         Args: null
@@ -3214,6 +3327,11 @@ tpl:
         Description: ""
         Examples: null
       Process:
+        Aliases: null
+        Args: null
+        Description: ""
+        Examples: null
+      QR:
         Aliases: null
         Args: null
         Description: ""
@@ -3289,6 +3407,11 @@ tpl:
         - args
         Description: Babel processes the given Resource with Babel.
         Examples: []
+      Batch:
+        Aliases: null
+        Args: null
+        Description: ""
+        Examples: null
       Build:
         Aliases: null
         Args: null

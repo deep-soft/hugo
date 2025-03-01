@@ -14,7 +14,7 @@ action:
 toc: true
 ---
 
-{{< new-in 0.119.0 >}}
+{{< new-in 0.119.0 />}}
 
 This filter has the same options as the [`Process`] method on a `Resource` object, but using it as a filter may be more effective if you need to apply multiple filters to an image.
 
@@ -71,7 +71,6 @@ hint
 : Applicable to WebP images and equivalent to the `-preset` flag for the [`cwebp`] encoder. Specify zero or one of `drawing`, `icon`, `photo`, `picture`, or `text`. Default is `photo`. See&nbsp;[details](/content-management/image-processing/#hint).
 
 [`cwebp`]: https://developers.google.com/speed/webp/docs/cwebp
-
 
 ```go-html-template
 {{ $filter := images.Process "webp" "icon" }}

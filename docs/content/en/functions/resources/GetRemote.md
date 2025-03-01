@@ -18,22 +18,64 @@ action:
 toc: true
 ---
 
+{{< new-in 0.141.0 >}}
+The `Err` method on the returned resource was removed in v0.141.0.
+
+Use the [`try`] statement instead, as shown in the [error handling] example below.
+
+[`try`]: /functions/go-template/try
+[error handling]: #error-handling
+{{< /new-in >}}
+
 ```go-html-template
 {{ $url := "https://example.org/images/a.jpg" }}
-{{ with resources.GetRemote $url }}
+{{ with try (resources.GetRemote $url) }}
   {{ with .Err }}
     {{ errorf "%s" . }}
-  {{ else }}
+  {{ else with .Value }}
     <img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="">
+  {{ else }}
+    {{ errorf "Unable to get remote resource %q" $url }}
   {{ end }}
-{{ else }}
-  {{ errorf "Unable to get remote resource %q" $url }}
 {{ end }}
 ```
 
 ## Options
 
 The `resources.GetRemote` function takes an optional map of options.
+
+###### body
+
+(`string`) The data you want to transmit to the server.
+
+###### headers
+
+(`map[string][]string`) The collection of key-value pairs that provide additional information about the request.
+
+###### key
+
+(`string`) The cache key. Hugo derives the default value from the URL and options map. See [caching](#caching).
+
+###### method
+
+(`string`) The action to perform on the requested resource, typically one of `GET`, `POST`, or `HEAD`.
+
+###### responseHeaders
+{{< new-in 0.143.0 />}}
+
+(`[]string`) The headers to extract from the server's response, accessible through the resource's [`Data.Headers`] method. Header name matching is case-insensitive.
+
+[`Data.Headers`]: /methods/resource/data/#headers
+
+## Options examples
+
+{{% note %}}
+For brevity, the examples below do not include [error handling].
+
+[error handling]: #error-handling
+{{% /note %}}
+
+To include a header:
 
 ```go-html-template
 {{ $url := "https://example.org/api" }}
@@ -43,7 +85,7 @@ The `resources.GetRemote` function takes an optional map of options.
 {{ $resource := resources.GetRemote $url $opts }}
 ```
 
-If you need multiple values for the same header key, use a slice:
+To specify more than one value for the same header key, use a slice:
 
 ```go-html-template
 {{ $url := "https://example.org/api" }}
@@ -53,7 +95,7 @@ If you need multiple values for the same header key, use a slice:
 {{ $resource := resources.GetRemote $url $opts }}
 ```
 
-You can also change the request method and set the request body:
+To post data:
 
 ```go-html-template
 {{ $url := "https://example.org/api" }}
@@ -65,24 +107,44 @@ You can also change the request method and set the request body:
 {{ $resource := resources.GetRemote $url $opts }}
 ```
 
+To override the default cache key:
+
+```go-html-template
+{{ $url := "https://example.org/images/a.jpg" }}
+{{ $opts := dict 
+  "key" (print $url (now.Format "2006-01-02"))
+}}
+{{ $resource := resources.GetRemote $url $opts }}
+```
+
+To extract specific headers from the server's response:
+
+```go-html-template
+{{ $url := "https://example.org/images/a.jpg" }}
+{{ $opts := dict
+  "method" "HEAD"
+  "responseHeaders" (slice "X-Frame-Options" "Server")
+}}
+{{ $resource := resources.GetRemote $url $opts }}
+```
+
 ## Remote data
 
-When retrieving remote data, use the [`transform.Unmarshal`] function to [unmarshal] the response.
+When retrieving remote data, use the [`transform.Unmarshal`] function to [unmarshal](g) the response.
 
 [`transform.Unmarshal`]: /functions/transform/unmarshal/
-[unmarshal]: /getting-started/glossary/#unmarshal
 
 ```go-html-template
 {{ $data := dict }}
 {{ $url := "https://example.org/books.json" }}
-{{ with resources.GetRemote $url }}
+{{ with try (resources.GetRemote $url) }}
   {{ with .Err }}
     {{ errorf "%s" . }}
-  {{ else }}
+  {{ else with .Value }}
     {{ $data = . | transform.Unmarshal }}
+  {{ else }}
+    {{ errorf "Unable to get remote resource %q" $url }}
   {{ end }}
-{{ else }}
-  {{ errorf "Unable to get remote resource %q" $url }}
 {{ end }}
 ```
 
@@ -98,24 +160,24 @@ In these cases, pass the resource `Content` through the `transform.Unmarshal` fu
 
 ## Error handling
 
-The [`Err`] method on a resource returned by the `resources.GetRemote` function returns an error message if the HTTP request fails, else nil. If you do not handle the error yourself, Hugo will fail the build.
+Use the [`try`] statement to capture HTTP request errors. If you do not handle the error yourself, Hugo will fail the build.
 
-[`Err`]: /methods/resource/err/
+[`try`]: /functions/go-template/try
 
 {{% note %}}
-Hugo does not classify an HTTP response with status code 404 as an error. In this case the function returns nil.
+Hugo does not classify an HTTP response with status code 404 as an error. In this case `resources.GetRemote` returns nil.
 {{% /note %}}
 
 ```go-html-template
 {{ $url := "https://broken-example.org/images/a.jpg" }}
-{{ with resources.GetRemote $url }}
+{{ with try (resources.GetRemote $url) }}
   {{ with .Err }}
     {{ errorf "%s" . }}
-  {{ else }}
+  {{ else with .Value }}
     <img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="">
+  {{ else }}
+    {{ errorf "Unable to get remote resource %q" $url }}
   {{ end }}
-{{ else }}
-  {{ errorf "Unable to get remote resource %q" $url }}
 {{ end }}
 ```
 
@@ -123,14 +185,14 @@ To log an error as a warning instead of an error:
 
 ```go-html-template
 {{ $url := "https://broken-example.org/images/a.jpg" }}
-{{ with resources.GetRemote $url }}
+{{ with try (resources.GetRemote $url) }}
   {{ with .Err }}
     {{ warnf "%s" . }}
-  {{ else }}
+  {{ else with .Value }}
     <img src="{{ .RelPermalink }}" width="{{ .Width }}" height="{{ .Height }}" alt="">
+  {{ else }}
+    {{ warnf "Unable to get remote resource %q" $url }}
   {{ end }}
-{{ else }}
-  {{ errorf "Unable to get remote resource %q" $url }}
 {{ end }}
 ```
 
@@ -139,40 +201,6 @@ To log an error as a warning instead of an error:
 The [`Data`] method on a resource returned by the `resources.GetRemote` function returns information from the HTTP response.
 
 [`Data`]: /methods/resource/data/
-
-```go-html-template
-{{ $url := "https://example.org/images/a.jpg" }}
-{{ with resources.GetRemote $url }}
-  {{ with .Err }}
-    {{ errorf "%s" . }}
-  {{ else }}
-    {{ with .Data }}
-      {{ .ContentLength }} → 42764
-      {{ .ContentType }} → image/jpeg
-      {{ .Status }} → 200 OK
-      {{ .StatusCode }} → 200
-      {{ .TransferEncoding }} → []
-    {{ end }}
-  {{ end }}
-{{ else }}
-  {{ errorf "Unable to get remote resource %q" $url }}
-{{ end }}
-```
-
-ContentLength
-: (`int`) The content length in bytes.
-
-ContentType
-: (`string`) The content type.
-
-Status
-: (`string`) The HTTP status text.
-
-StatusCode
-: (`int`) The HTTP status code.
-
-TransferEncoding
-: (`string`) The transfer encoding.
 
 ## Caching
 
@@ -185,7 +213,8 @@ Override the cache key by setting a `key` in the options map. Use this approach 
 ```go-html-template
 {{ $url := "https://example.org/images/a.jpg" }}
 {{ $cacheKey := print $url (now.Format "2006-01-02") }}
-{{ $resource := resources.GetRemote $url (dict "key" $cacheKey) }}
+{{ $opts := dict "key" $cacheKey }}
+{{ $resource := resources.GetRemote $url $opts }}
 ```
 
 [configure file caches]: /getting-started/configuration/#configure-file-caches

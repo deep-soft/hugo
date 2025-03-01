@@ -24,6 +24,7 @@ import (
 	"github.com/gohugoio/hugo/hugofs/glob"
 	"github.com/gohugoio/hugo/resources/kinds"
 	"github.com/mitchellh/mapstructure"
+	"slices"
 )
 
 // A PageMatcher can be used to match a Page with Glob patterns.
@@ -104,9 +105,9 @@ func CheckCascadePattern(logger loggers.Logger, m PageMatcher) {
 	}
 }
 
-func DecodeCascadeConfig(logger loggers.Logger, in any) (*config.ConfigNamespace[[]PageMatcherParamsConfig, map[PageMatcher]maps.Params], error) {
-	buildConfig := func(in any) (map[PageMatcher]maps.Params, any, error) {
-		cascade := make(map[PageMatcher]maps.Params)
+func DecodeCascadeConfig(logger loggers.Logger, in any) (*config.ConfigNamespace[[]PageMatcherParamsConfig, *maps.Ordered[PageMatcher, maps.Params]], error) {
+	buildConfig := func(in any) (*maps.Ordered[PageMatcher, maps.Params], any, error) {
+		cascade := maps.NewOrdered[PageMatcher, maps.Params]()
 		if in == nil {
 			return cascade, []map[string]any{}, nil
 		}
@@ -134,7 +135,7 @@ func DecodeCascadeConfig(logger loggers.Logger, in any) (*config.ConfigNamespace
 		for _, cfg := range cfgs {
 			m := cfg.Target
 			CheckCascadePattern(logger, m)
-			c, found := cascade[m]
+			c, found := cascade.Get(m)
 			if found {
 				// Merge
 				for k, v := range cfg.Params {
@@ -143,18 +144,18 @@ func DecodeCascadeConfig(logger loggers.Logger, in any) (*config.ConfigNamespace
 					}
 				}
 			} else {
-				cascade[m] = cfg.Params
+				cascade.Set(m, cfg.Params)
 			}
 		}
 
 		return cascade, cfgs, nil
 	}
 
-	return config.DecodeNamespace[[]PageMatcherParamsConfig](in, buildConfig)
+	return config.DecodeNamespace[[]PageMatcherParamsConfig, *maps.Ordered[PageMatcher, maps.Params]](in, buildConfig)
 }
 
 // DecodeCascade decodes in which could be either a map or a slice of maps.
-func DecodeCascade(logger loggers.Logger, in any) (map[PageMatcher]maps.Params, error) {
+func DecodeCascade(logger loggers.Logger, in any) (*maps.Ordered[PageMatcher, maps.Params], error) {
 	conf, err := DecodeCascadeConfig(logger, in)
 	if err != nil {
 		return nil, err
@@ -208,13 +209,7 @@ func decodePageMatcher(m any, v *PageMatcher) error {
 	v.Kind = strings.ToLower(v.Kind)
 	if v.Kind != "" {
 		g, _ := glob.GetGlob(v.Kind)
-		found := false
-		for _, k := range kinds.AllKindsInPages {
-			if g.Match(k) {
-				found = true
-				break
-			}
-		}
+		found := slices.ContainsFunc(kinds.AllKindsInPages, g.Match)
 		if !found {
 			return fmt.Errorf("%q did not match a valid Page Kind", v.Kind)
 		}

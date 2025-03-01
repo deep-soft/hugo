@@ -17,15 +17,21 @@ action:
 toc: true
 ---
 
-{{< new-in 0.117.0 >}}
+{{< new-in 0.117.0 />}}
 
 Use this method in shortcode templates to compose a page from multiple content files, while preserving a global context for footnotes and the table of contents.
 
 For example:
 
 {{< code file=layouts/shortcodes/include.html >}}
-{{ with site.GetPage (.Get 0) }}
-  {{ .RenderShortcodes }}
+{{ with .Get 0 }}
+  {{ with $.Page.GetPage . }}
+    {{- .RenderShortcodes }}
+  {{ else }}
+    {{ errorf "The %q shortcode was unable to find %q. See %s" $.Name . $.Position }}
+  {{ end }}
+{{ else }}
+  {{ errorf "The %q shortcode requires a positional parameter indicating the logical path of the file to include. See %s" .Name .Position }}
 {{ end }}
 {{< /code >}}
 
@@ -79,7 +85,6 @@ An *emphasized* word.
 ```
 
 Note that the shortcode within the content file was rendered, but the surrounding Markdown was preserved.
-
 
 ## Limitations
 

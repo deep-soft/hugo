@@ -105,6 +105,12 @@ func TestOptWithOSFs() TestOpt {
 	}
 }
 
+func TestOptWithPrintAndKeepTempDir(b bool) TestOpt {
+	return func(c *IntegrationTestConfig) {
+		c.PrintAndKeepTempDir = b
+	}
+}
+
 // TestOptWithWorkingDir allows setting any config optiona as a function al option.
 func TestOptWithConfig(fn func(c *IntegrationTestConfig)) TestOpt {
 	return func(c *IntegrationTestConfig) {
@@ -481,11 +487,11 @@ func (s *IntegrationTestBuilder) BuildPartialE(urls ...string) (*IntegrationTest
 	if !s.Cfg.Running {
 		panic("BuildPartial can only be used in server mode")
 	}
-	visited := types.NewEvictingStringQueue(len(urls))
+	visited := types.NewEvictingQueue[string](len(urls))
 	for _, url := range urls {
 		visited.Add(url)
 	}
-	buildCfg := BuildCfg{RecentlyVisited: visited, PartialReRender: true}
+	buildCfg := BuildCfg{RecentlyTouched: visited, PartialReRender: true}
 	return s, s.build(buildCfg)
 }
 
@@ -729,7 +735,7 @@ func (s *IntegrationTestBuilder) initBuilder() error {
 			sc := security.DefaultConfig
 			sc.Exec.Allow, err = security.NewWhitelist("npm")
 			s.Assert(err, qt.IsNil)
-			ex := hexec.New(sc, s.Cfg.WorkingDir)
+			ex := hexec.New(sc, s.Cfg.WorkingDir, loggers.NewDefault())
 			command, err := ex.New("npm", "install")
 			s.Assert(err, qt.IsNil)
 			s.Assert(command.Run(), qt.IsNil)

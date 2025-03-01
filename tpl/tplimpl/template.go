@@ -66,6 +66,8 @@ const (
 // We need this to identify position in templates with base templates applied.
 var identifiersRe = regexp.MustCompile(`at \<(.*?)(\.{3})?\>:`)
 
+// The tweet and twitter shortcodes were deprecated in favor of the x shortcode
+// in v0.141.0. We can remove these aliases in v0.155.0 or later.
 var embeddedTemplatesAliases = map[string][]string{
 	"shortcodes/twitter.html": {"shortcodes/tweet.html"},
 }
@@ -429,7 +431,7 @@ func (t *templateHandler) LookupVariants(name string) []tpl.Template {
 	}
 
 	variants := make([]tpl.Template, len(s.variants))
-	for i := 0; i < len(variants); i++ {
+	for i := range variants {
 		variants[i] = s.variants[i].ts
 	}
 
@@ -597,7 +599,7 @@ func (t *templateHandler) addFileContext(templ tpl.Template, inerr error) error 
 func (t *templateHandler) extractIdentifiers(line string) []string {
 	m := identifiersRe.FindAllStringSubmatch(line, -1)
 	identifiers := make([]string, len(m))
-	for i := 0; i < len(m); i++ {
+	for i := range m {
 		identifiers[i] = m[i][1]
 	}
 	return identifiers

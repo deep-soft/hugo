@@ -151,6 +151,20 @@ func (p *pageState) Key() string {
 	return "page-" + strconv.FormatUint(p.pid, 10)
 }
 
+// RelatedKeywords implements the related.Document interface needed for fast page searches.
+func (p *pageState) RelatedKeywords(cfg related.IndexConfig) ([]related.Keyword, error) {
+	v, found, err := page.NamedPageMetaValue(p, cfg.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return nil, nil
+	}
+
+	return cfg.ToKeywords(v)
+}
+
 func (p *pageState) resetBuildState() {
 	// Nothing to do for now.
 }
@@ -183,10 +197,6 @@ func (po *pageState) isRenderedAny() bool {
 
 func (p *pageState) isContentNodeBranch() bool {
 	return p.IsNode()
-}
-
-func (p *pageState) Err() resource.ResourceError {
-	return nil
 }
 
 // Eq returns whether the current page equals the given page.
@@ -697,7 +707,7 @@ func (p *pageState) shiftToOutputFormat(isRenderingSite bool, idx int) error {
 		cp := p.pageOutput.pco
 		if cp == nil && p.reusePageOutputContent() {
 			// Look for content to reuse.
-			for i := 0; i < len(p.pageOutputs); i++ {
+			for i := range p.pageOutputs {
 				if i == idx {
 					continue
 				}

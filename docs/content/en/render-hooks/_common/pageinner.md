@@ -4,13 +4,19 @@ _comment: Do not remove front matter.
 
 ## PageInner details
 
-{{< new-in 0.125.0 >}}
+{{< new-in 0.125.0 />}}
 
-The primary use case for `PageInner` is to resolve links and [page resources] relative to an included `Page`. For example, create an "include" shortcode to compose a page from multiple content files, while preserving a global context for footnotes and the table of contents:
+The primary use case for `PageInner` is to resolve links and [page resources](g) relative to an included `Page`. For example, create an "include" shortcode to compose a page from multiple content files, while preserving a global context for footnotes and the table of contents:
 
 {{< code file=layouts/shortcodes/include.html >}}
-{{ with site.GetPage (.Get 0) }}
-  {{ .RenderShortcodes }}
+{{ with .Get 0 }}
+  {{ with $.Page.GetPage . }}
+    {{- .RenderShortcodes }}
+  {{ else }}
+    {{ errorf "The %q shortcode was unable to find %q. See %s" $.Name . $.Position }}
+  {{ end }}
+{{ else }}
+  {{ errorf "The %q shortcode requires a positional parameter indicating the logical path of the file to include. See %s" .Name .Position }}
 {{ end }}
 {{< /code >}}
 
@@ -39,4 +45,3 @@ As a practical example, Hugo's embedded link and image render hooks use the `Pag
 - [Embedded image render hook]({{% eturl render-image %}})
 
 [`RenderShortcodes`]: /methods/page/rendershortcodes/
-[page resources]: /getting-started/glossary/#page-resource

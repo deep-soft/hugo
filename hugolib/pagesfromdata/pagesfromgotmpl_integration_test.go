@@ -1,4 +1,4 @@
-// Copyright 2024 The Hugo Authors. All rights reserved.
+// Copyright 2025 The Hugo Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"github.com/gohugoio/hugo/markup/asciidocext"
 	"github.com/gohugoio/hugo/markup/pandoc"
 	"github.com/gohugoio/hugo/markup/rst"
+	"github.com/gohugoio/hugo/related"
 )
 
 const filesPagesFromDataTempleBasic = `
@@ -73,10 +74,11 @@ Pfile Content
 {{ $title := printf "%s:%s" $pd $pp }}
 {{ $date := "2023-03-01" | time.AsTime }}
 {{ $dates := dict "date" $date }}
+{{ $keywords := slice "foo" "Bar"}}
 {{ $contentMarkdown := dict "value" "**Hello World**"  "mediaType" "text/markdown" }}
 {{ $contentMarkdownDefault := dict "value" "**Hello World Default**" }}
 {{ $contentHTML := dict "value" "<b>Hello World!</b> No **markdown** here." "mediaType" "text/html" }}
-{{ $.AddPage  (dict "kind" "page" "path" "P1" "title" $title "dates" $dates "content" $contentMarkdown "params" (dict "param1" "param1v" ) ) }}
+{{ $.AddPage  (dict "kind" "page" "path" "P1" "title" $title "dates" $dates "keywords" $keywords "content" $contentMarkdown "params" (dict "param1" "param1v" ) ) }}
 {{ $.AddPage  (dict "kind" "page" "path" "p2" "title" "p2title" "dates" $dates "content" $contentHTML ) }}
 {{ $.AddPage  (dict "kind" "page" "path" "p3" "title" "p3title" "dates" $dates "content" $contentMarkdownDefault "draft" false ) }}
 {{ $.AddPage  (dict "kind" "page" "path" "p4" "title" "p4title" "dates" $dates "content" $contentMarkdownDefault "draft" $data.draft ) }}
@@ -119,7 +121,7 @@ docs/p1/sub/mymixcasetext2.txt
 		"RelPermalink: /docs/p1/sub/mymixcasetext2.txt|Name: sub/mymixcasetext2.txt|",
 		"RelPermalink: /mydata.yaml|Name: sub/data1.yaml|Title: Sub data|Params: map[]|",
 		"Featured Image: /a/pixel.png|featured.png|",
-		"Resized Featured Image: /a/pixel_hu16809842526914527184.png|10|",
+		"Resized Featured Image: /a/pixel_hu_a32b3e361d55df1.png|10|",
 		// Resource from string
 		"RelPermalink: /docs/p1/mytext.txt|Name: textresource|Title: My Text Resource|Params: map[param1:param1v]|",
 		// Dates
@@ -329,6 +331,24 @@ func TestPagesFromGoTmplRemoveGoTmpl(t *testing.T) {
 	b.AssertFileContent("public/docs/index.html", "RegularPagesRecursive: pfile:/docs/pfile|$")
 }
 
+// Issue #13443.
+func TestPagesFromGoRelatedKeywords(t *testing.T) {
+	t.Parallel()
+	b := hugolib.Test(t, filesPagesFromDataTempleBasic)
+
+	p1 := b.H.Sites[0].RegularPages()[0]
+	icfg := related.IndexConfig{
+		Name: "keywords",
+	}
+	k, err := p1.RelatedKeywords(icfg)
+	b.Assert(err, qt.IsNil)
+	b.Assert(k, qt.DeepEquals, icfg.StringsToKeywords("foo", "Bar"))
+	icfg.Name = "title"
+	k, err = p1.RelatedKeywords(icfg)
+	b.Assert(err, qt.IsNil)
+	b.Assert(k, qt.DeepEquals, icfg.StringsToKeywords("p1:p1"))
+}
+
 func TestPagesFromGoTmplLanguagePerFile(t *testing.T) {
 	filesTemplate := `
 -- hugo.toml --
@@ -360,6 +380,28 @@ Single: {{ .Title }}|{{ .Content }}|
 			}
 		})
 	}
+}
+
+func TestPagesFromGoTmplDefaultPageSort(t *testing.T) {
+	t.Parallel()
+	files := `
+-- hugo.toml --
+defaultContentLanguage = "en"
+-- layouts/index.html --
+{{ range site.RegularPages }}{{ .RelPermalink }}|{{ end}}
+-- content/_content.gotmpl --
+{{ $.AddPage  (dict "kind" "page" "path" "docs/_p22" "title" "A" ) }}
+{{ $.AddPage  (dict "kind" "page" "path" "docs/p12" "title" "A" ) }}
+{{ $.AddPage  (dict "kind" "page" "path" "docs/_p12" "title" "A" ) }}
+-- content/docs/_content.gotmpl --
+{{ $.AddPage  (dict "kind" "page" "path" "_p21" "title" "A" ) }}
+{{ $.AddPage  (dict "kind" "page" "path" "p11" "title" "A" ) }}
+{{ $.AddPage  (dict "kind" "page" "path" "_p11" "title" "A" ) }}
+`
+
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/index.html", "/docs/_p11/|/docs/_p12/|/docs/_p21/|/docs/_p22/|/docs/p11/|/docs/p12/|")
 }
 
 func TestPagesFromGoTmplEnableAllLanguages(t *testing.T) {
@@ -651,6 +693,34 @@ Footer: {{ range index site.Menus.footer }}{{ .Name }}|{{ end }}|
 		"Main: Main|p1|p2||",
 		"Footer: Footer|p2||",
 	)
+}
+
+// Issue 13384.
+func TestPagesFromGoTmplMenusMap(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['rss','section','sitemap','taxonomy','term']
+-- content/_content.gotmpl --
+{{ $menu1 := dict 
+    "parent" "main-page"
+    "identifier" "id1"
+}}
+{{ $menu2 := dict 
+    "parent" "main-page"
+    "identifier" "id2"
+}}
+{{ $menus := dict "m1" $menu1 "m2" $menu2 }}
+{{ .AddPage (dict "path" "p1" "title" "p1" "menus" $menus ) }}
+
+-- layouts/index.html --
+Menus: {{ range $k, $v := site.Menus }}{{ $k }}|{{ end }}
+
+`
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/index.html", "Menus: m1|m2|")
 }
 
 func TestPagesFromGoTmplMore(t *testing.T) {

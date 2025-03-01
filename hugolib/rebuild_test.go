@@ -124,7 +124,7 @@ func TestRebuildEditTextFileInLeafBundle(t *testing.T) {
 
 func TestRebuildEditTextFileInShortcode(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		b := TestRunning(t, rebuildFilesSimple)
 		b.AssertFileContent("public/mythirdsection/mythirdsectionpage/index.html",
 			"Text: Assets My Shortcode Text.")
@@ -138,7 +138,7 @@ func TestRebuildEditTextFileInShortcode(t *testing.T) {
 
 func TestRebuildEditTextFileInHook(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		b := TestRunning(t, rebuildFilesSimple)
 		b.AssertFileContent("public/mythirdsection/mythirdsectionpage/index.html",
 			"Text: Assets My Other Text.")
@@ -208,7 +208,7 @@ func TestRebuildRenameTextFileInLeafBundle(t *testing.T) {
 		b.RenameFile("content/mysection/mysectionbundle/mysectionbundletext.txt", "content/mysection/mysectionbundle/mysectionbundletext2.txt").Build()
 		b.AssertFileContent("public/mysection/mysectionbundle/index.html", "mysectionbundletext2", "My Section Bundle Text 2 Content.", "Len Resources: 2|")
 		b.AssertRenderCountPage(8)
-		b.AssertRenderCountContent(8)
+		b.AssertRenderCountContent(9)
 	})
 }
 
@@ -357,8 +357,8 @@ RegularPages: {{ range .Site.RegularPages }}{{ .RelPermalink }}|{{ end }}$
 }
 
 func TestRebuildRenameDirectoryWithBranchBundleFastRender(t *testing.T) {
-	recentlyVisited := types.NewEvictingStringQueue(10).Add("/a/b/c/")
-	b := TestRunning(t, rebuildFilesSimple, func(cfg *IntegrationTestConfig) { cfg.BuildCfg = BuildCfg{RecentlyVisited: recentlyVisited} })
+	recentlyVisited := types.NewEvictingQueue[string](10).Add("/a/b/c/")
+	b := TestRunning(t, rebuildFilesSimple, func(cfg *IntegrationTestConfig) { cfg.BuildCfg = BuildCfg{RecentlyTouched: recentlyVisited} })
 	b.RenameDir("content/mysection", "content/mysectionrenamed").Build()
 	b.AssertFileContent("public/mysectionrenamed/index.html", "My Section")
 	b.AssertFileContent("public/mysectionrenamed/mysectionbundle/index.html", "My Section Bundle")
@@ -1181,6 +1181,49 @@ Content: {{ .Content }}
 	b.AssertFileContent("public/index.html", "Content: <p>Home</p>")
 }
 
+// Issue #13014.
+func TestRebuildEditNotPermalinkableCustomOutputFormatTemplateInFastRenderMode(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+baseURL = "https://example.com/docs/"
+disableLiveReload = true
+[internal]
+fastRenderMode = true
+disableKinds = ["taxonomy", "term", "sitemap", "robotsTXT", "404"]
+[outputFormats]
+  [outputFormats.SearchIndex]
+    baseName = 'Search'
+    isPlainText = true
+    mediaType = 'text/plain'
+    noAlternative = true
+	permalinkable = false
+
+[outputs]
+  home = ['HTML', 'SearchIndex']
+-- content/_index.md --
+---
+title: "Home"
+---
+Home.
+-- layouts/index.html --
+Home.
+-- layouts/_default/index.searchindex.txt --
+Text. {{ .Title }}|{{ .RelPermalink }}|
+
+`
+	b := TestRunning(t, files, TestOptInfo())
+
+	b.AssertFileContent("public/search.txt", "Text.")
+
+	b.EditFileReplaceAll("layouts/_default/index.searchindex.txt", "Text.", "Text Edited.").Build()
+
+	b.BuildPartial("/docs/search.txt")
+
+	b.AssertFileContent("public/search.txt", "Text Edited.")
+}
+
 func TestRebuildVariationsAssetsJSImport(t *testing.T) {
 	t.Parallel()
 	files := `
@@ -1502,7 +1545,7 @@ title: "P%d"
 P%d Content.
 `
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		files += fmt.Sprintf("-- content/mysect/p%d/index.md --\n%s", i, fmt.Sprintf(contentTemplate, i, i))
 	}
 

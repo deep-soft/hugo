@@ -12,7 +12,7 @@ action:
 aliases: [/functions/templates.defer]
 ---
 
-{{< new-in "0.128.0" >}}
+{{< new-in 0.128.0 />}}
 
 In some rare use cases, you may need to defer the execution of a template until after all sites and output formats have been rendered. One such example could be [TailwindCSS](/functions/css/tailwindcss/) using the output of [hugo_stats.json](/getting-started/configuration/#configure-build) to determine which classes and other HTML identifiers are being used in the final output:
 
@@ -46,7 +46,6 @@ In some rare use cases, you may need to defer the execution of a template until 
 This function only works in combination with the `with` keyword.
 {{% /note %}}
 
-
 {{% note %}}
 Variables defined on the outside are not visible on the inside and vice versa. To pass in data, use the `data` [option](#options).
 {{% /note %}}
@@ -78,7 +77,6 @@ key (`string`)
 
 data (`map`) 
 : Optional map to pass as data to the deferred template. This will be available in the deferred template as `.` or `$`.
-
 
 ```go-html-template
 Language Outside: {{ site.Language.Lang }}

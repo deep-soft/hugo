@@ -147,13 +147,13 @@ func TestClear(t *testing.T) {
 
 	c.Assert(cache.Keys(predicateAll), qt.HasLen, 4)
 
-	cache.ClearOnRebuild()
+	cache.ClearOnRebuild(nil)
 
 	// Stale items are always cleared.
 	c.Assert(cache.Keys(predicateAll), qt.HasLen, 2)
 
 	cache = newTestCache(t)
-	cache.ClearOnRebuild(identity.StringIdentity("changed"))
+	cache.ClearOnRebuild(nil, identity.StringIdentity("changed"))
 
 	c.Assert(cache.Keys(nil), qt.HasLen, 1)
 
@@ -191,16 +191,16 @@ func TestPanicInCreate(t *testing.T) {
 		return err
 	}
 
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
+	for i := range 3 {
+		for range 3 {
 			c.Assert(willPanic(i), qt.PanicMatches, fmt.Sprintf("panic-%d", i))
 			c.Assert(willErr(i), qt.ErrorMatches, fmt.Sprintf("error-%d", i))
 		}
 	}
 
 	// Test the same keys again without the panic.
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
+	for i := range 3 {
+		for range 3 {
 			v, err := p1.GetOrCreate(fmt.Sprintf("panic-%d", i), func(key string) (testItem, error) {
 				return testItem{
 					name: key,

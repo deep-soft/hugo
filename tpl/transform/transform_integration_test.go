@@ -183,7 +183,27 @@ disableKinds = ['page','rss','section','sitemap','taxonomy','term']
 -- hugo.toml --
 disableKinds = ['page','rss','section','sitemap','taxonomy','term']
 -- layouts/index.html --
-{{ with transform.ToMath "c = \\foo{a^2 + b^2}" }}
+{{ with try (transform.ToMath "c = \\foo{a^2 + b^2}") }}
+	{{ with .Err }}
+	 	{{ warnf "error: %s" . }}
+	{{ else }}
+		{{ .Value }}
+	{{ end }}
+{{ end }}
+  `
+		b, err := hugolib.TestE(t, files, hugolib.TestOptWarn())
+
+		b.Assert(err, qt.IsNil)
+		b.AssertLogContains("WARN  error: template: index.html:1:22: executing \"index.html\" at <transform.ToMath>: error calling ToMath: KaTeX parse error: Undefined control sequence: \\foo at position 5: c = \\̲f̲o̲o̲{a^2 + b^2}")
+	})
+
+	// See issue 13239.
+	t.Run("Handle in template, old Err construct", func(t *testing.T) {
+		files := `
+-- hugo.toml --
+disableKinds = ['page','rss','section','sitemap','taxonomy','term']
+-- layouts/index.html --
+{{ with transform.ToMath "c = \\pm\\sqrt{a^2 + b^2}" }}
 	{{ with .Err }}
 	 	{{ warnf "error: %s" . }}
 	{{ else }}
@@ -193,8 +213,8 @@ disableKinds = ['page','rss','section','sitemap','taxonomy','term']
   `
 		b, err := hugolib.TestE(t, files, hugolib.TestOptWarn())
 
-		b.Assert(err, qt.IsNil)
-		b.AssertLogContains("WARN  error: KaTeX parse error: Undefined control sequence: \\foo")
+		b.Assert(err, qt.IsNotNil)
+		b.Assert(err.Error(), qt.Contains, "the return type of transform.ToMath was changed in Hugo v0.141.0 and the error handling replaced with a new try keyword, see https://gohugo.io/functions/go-template/try/")
 	})
 }
 
@@ -243,6 +263,56 @@ $$%s$$
 	})
 }
 
+// Issue #13406.
+func TestToMathRenderHookPosition(t *testing.T) {
+	filesTemplate := `
+-- hugo.toml --
+disableKinds = ['rss','section','sitemap','taxonomy','term']
+[markup.goldmark.extensions.passthrough]
+enable = true
+[markup.goldmark.extensions.passthrough.delimiters]
+block  = [['\[', '\]'], ['$$', '$$']]
+inline = [['\(', '\)'], ['$', '$']]
+-- content/p1.md --
+---
+title: p1
+---
+
+Block:
+
+$$1+2$$
+
+Some inline $1+3$ math.
+
+-- layouts/index.html --
+Home.
+-- layouts/_default/single.html --
+Content: {{ .Content }}|
+-- layouts/_default/_markup/render-passthrough.html --
+{{ $opts := dict "throwOnError" true "displayMode" true }}
+{{- with try (transform.ToMath .Inner $opts ) }}
+  {{- with .Err }}
+    {{ errorf "KaTeX: %s: see %s." . $.Position }}
+  {{- else }}
+    {{- .Value }}
+  {{- end }}
+{{- end -}}
+
+`
+
+	// Block math.
+	files := strings.Replace(filesTemplate, "$$1+2$$", "$$\\foo1+2$$", 1)
+	b, err := hugolib.TestE(t, files)
+	b.Assert(err, qt.IsNotNil)
+	b.AssertLogContains("p1.md:6:1")
+
+	// Inline math.
+	files = strings.Replace(filesTemplate, "$1+3$", "$\\foo1+3$", 1)
+	b, err = hugolib.TestE(t, files)
+	b.Assert(err, qt.IsNotNil)
+	b.AssertLogContains("p1.md:8:13")
+}
+
 func TestToMathMacros(t *testing.T) {
 	files := `
 -- hugo.toml --
@@ -278,4 +348,34 @@ disableKinds = ['page','rss','section','sitemap','taxonomy','term']
 
 	b.AssertFileExists("public/index.html", true)
 	b.AssertFileContent("public/index.html", `{"a":{"b":1},"c":{"d":2}}`)
+}
+
+func TestPortableText(t *testing.T) {
+	files := `
+-- hugo.toml --
+-- assets/sample.json --
+[
+  {
+    "_key": "a",
+    "_type": "block",
+    "children": [
+      {
+        "_key": "b",
+        "_type": "span",
+        "marks": [],
+        "text": "Heading 2"
+      }
+    ],
+    "markDefs": [],
+    "style": "h2"
+  }
+]
+-- layouts/index.html --
+{{ $markdown := resources.Get "sample.json" | transform.Unmarshal | transform.PortableText }}
+Markdown: {{ $markdown }}|
+
+`
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/index.html", "Markdown: ## Heading 2\n|")
 }

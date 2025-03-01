@@ -15,7 +15,7 @@ aliases: [/templates/internal]
 ## Disqus
 
 {{% note %}}
-To override Hugo's embedded Disqus template, copy the [source code] to a file with the same name in the layouts/partials directory, then call it from your templates using the [`partial`] function:
+To override Hugo's embedded Disqus template, copy the [source code] to a file with the same name in the `layouts/partials` directory, then call it from your templates using the [`partial`] function:
 
 `{{ partial "disqus.html" . }}`
 
@@ -34,7 +34,7 @@ To include the embedded template:
 {{ template "_internal/disqus.html" . }}
 ```
 
-### Configure Disqus
+### Configuration {#configuration-disqus}
 
 To use Hugo's Disqus template, first set up a single configuration value:
 
@@ -55,10 +55,19 @@ You can also set the following in the front matter for a given piece of content:
 - `disqus_title`
 - `disqus_url`
 
+### Privacy {#privacy-disqus}
+
+Adjust the relevant privacy settings in your site configuration.
+
+{{< code-toggle config=privacy.disqus />}}
+
+disable
+: (`bool`) Whether to disable the template. Default is `false`.
+
 ## Google Analytics
 
 {{% note %}}
-To override Hugo's embedded Google Analytics template, copy the [source code] to a file with the same name in the layouts/partials directory, then call it from your templates using the [`partial`] function:
+To override Hugo's embedded Google Analytics template, copy the [source code] to a file with the same name in the `layouts/partials` directory, then call it from your templates using the [`partial`] function:
 
 `{{ partial "google_analytics.html" . }}`
 
@@ -76,7 +85,7 @@ To include the embedded template:
 {{ template "_internal/google_analytics.html" . }}
 ```
 
-### Configure Google Analytics
+### Configuration {#configuration-google-analytics}
 
 Provide your tracking ID in your configuration file:
 
@@ -87,10 +96,22 @@ id = "G-MEASUREMENT_ID"
 
 To use this value in your own template, access the configured ID with `{{ site.Config.Services.GoogleAnalytics.ID }}`.
 
+### Privacy {#privacy-google-analytics}
+
+Adjust the relevant privacy settings in your site configuration.
+
+{{< code-toggle config=privacy.googleAnalytics />}}
+
+disable
+: (`bool`) Whether to disable the template. Default is `false`.
+
+respectDoNotTrack
+: (`bool`) Whether to respect the browser's "do not track" setting. Default is `false`.
+
 ## Open Graph
 
 {{% note %}}
-To override Hugo's embedded Open Graph template, copy the [source code] to a file with the same name in the layouts/partials directory, then call it from your templates using the [`partial`] function:
+To override Hugo's embedded Open Graph template, copy the [source code] to a file with the same name in the `layouts/partials` directory, then call it from your templates using the [`partial`] function:
 
 `{{ partial "opengraph.html" . }}`
 
@@ -107,7 +128,7 @@ To include the embedded template:
 {{ template "_internal/opengraph.html" . }}
 ```
 
-### Configure Open Graph
+### Configuration {#configuration-open-graph}
 
 Hugo's Open Graph template is configured using a mix of configuration settings and [front matter](/content-management/front-matter/) on individual pages.
 
@@ -149,7 +170,7 @@ If using YouTube this will produce a og:video tag like `<meta property="og:video
 ## Schema
 
 {{% note %}}
-To override Hugo's embedded Schema template, copy the [source code] to a file with the same name in the layouts/partials directory, then call it from your templates using the [`partial`] function:
+To override Hugo's embedded Schema template, copy the [source code] to a file with the same name in the `layouts/partials` directory, then call it from your templates using the [`partial`] function:
 
 `{{ partial "schema.html" . }}`
 
@@ -170,7 +191,7 @@ To include the embedded template:
 ## X (Twitter) Cards
 
 {{% note %}}
-To override Hugo's embedded Twitter Cards template, copy the [source code] to a file with the same name in the layouts/partials directory, then call it from your templates using the [`partial`] function:
+To override Hugo's embedded Twitter Cards template, copy the [source code] to a file with the same name in the `layouts/partials` directory, then call it from your templates using the [`partial`] function:
 
 `{{ partial "twitter_cards.html" . }}`
 
@@ -187,7 +208,7 @@ To include the embedded template:
 {{ template "_internal/twitter_cards.html" . }}
 ```
 
-### Configure X (Twitter) Cards
+### Configuration {#configuration-x-cards}
 
 Hugo's X (Twitter) Card template is configured using a mix of configuration settings and [front-matter](/content-management/front-matter/) values on individual pages.
 

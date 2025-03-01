@@ -831,31 +831,47 @@ title: "Hugo Rocks!"
 func TestShortcodeNoInner(t *testing.T) {
 	t.Parallel()
 
-	b := newTestSitesBuilder(t)
-
-	b.WithContent("mypage.md", `---
+	files := `
+-- hugo.toml --
+baseURL = "https://example.org"
+disableKinds = ["term", "taxonomy", "home", "section"]
+-- content/mypage.md --
+---
 title: "No Inner!"
 ---
+
 {{< noinner >}}{{< /noinner >}}
 
+-- layouts/shortcodes/noinner.html --
+No inner here.
+-- layouts/_default/single.html --
+Content: {{ .Content }}|
 
-`).WithTemplatesAdded(
-		"layouts/shortcodes/noinner.html", `No inner here.`)
+`
 
-	err := b.BuildE(BuildCfg{})
-	b.Assert(err.Error(), qt.Contains, filepath.FromSlash(`"content/mypage.md:4:16": failed to extract shortcode: shortcode "noinner" does not evaluate .Inner or .InnerDeindent, yet a closing tag was provided`))
+	b, err := TestE(t, files)
+
+	assert := func() {
+		b.Assert(err.Error(), qt.Contains, filepath.FromSlash(`failed to extract shortcode: shortcode "noinner" does not evaluate .Inner or .InnerDeindent, yet a closing tag was provided`))
+	}
+
+	assert()
+
+	b, err = TestE(t, strings.Replace(files, `{{< noinner >}}{{< /noinner >}}`, `{{< noinner />}}`, 1))
+
+	assert()
 }
 
 func TestShortcodeStableOutputFormatTemplates(t *testing.T) {
 	t.Parallel()
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 
 		b := newTestSitesBuilder(t)
 
 		const numPages = 10
 
-		for i := 0; i < numPages; i++ {
+		for i := range numPages {
 			b.WithContent(fmt.Sprintf("page%d.md", i), `---
 title: "Page"
 outputs: ["html", "css", "csv", "json"]
@@ -878,14 +894,14 @@ outputs: ["html", "css", "csv", "json"]
 
 		// helpers.PrintFs(b.Fs.Destination, "public", os.Stdout)
 
-		for i := 0; i < numPages; i++ {
+		for i := range numPages {
 			b.AssertFileContent(fmt.Sprintf("public/page%d/index.html", i), "Short-HTML")
 			b.AssertFileContent(fmt.Sprintf("public/page%d/index.csv", i), "Short-CSV")
 			b.AssertFileContent(fmt.Sprintf("public/page%d/index.json", i), "Short-HTML")
 
 		}
 
-		for i := 0; i < numPages; i++ {
+		for i := range numPages {
 			b.AssertFileContent(fmt.Sprintf("public/page%d/styles.css", i), "Short-HTML")
 		}
 

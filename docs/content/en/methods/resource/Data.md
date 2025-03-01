@@ -17,37 +17,49 @@ The `Data` method on a resource returned by the [`resources.GetRemote`] function
 
 ```go-html-template
 {{ $url := "https://example.org/images/a.jpg" }}
-{{ with resources.GetRemote $url }}
+{{ $opts := dict "responseHeaders" (slice "Server") }}
+{{ with try (resources.GetRemote $url) }}
   {{ with .Err }}
     {{ errorf "%s" . }}
-  {{ else }}
+  {{ else with .Value }}
     {{ with .Data }}
       {{ .ContentLength }} → 42764
       {{ .ContentType }} → image/jpeg
+      {{ .Headers }} → map[Server:[Netlify]]
       {{ .Status }} → 200 OK
       {{ .StatusCode }} → 200
       {{ .TransferEncoding }} → []
     {{ end }}
+  {{ else }}
+    {{ errorf "Unable to get remote resource %q" $url }}
   {{ end }}
-{{ else }}
-  {{ errorf "Unable to get remote resource %q" $url }}
 {{ end }}
 ```
 
-ContentLength
-: (`int`) The content length in bytes.
+###### ContentLength
 
-ContentType
-: (`string`) The content type.
+(`int`) The content length in bytes.
 
-Status
-: (`string`) The HTTP status text.
+###### ContentType
 
-StatusCode
-: (`int`) The HTTP status code.
+(`string`) The content type.
 
-TransferEncoding
-: (`string`) The transfer encoding.
+###### Headers
 
+(`map[string][]string`) A map of response headers matching those requested in the [`responseHeaders`] option passed to the `resources.GetRemote` function. The header name matching is case-insensitive. In most cases there will be one value per header key.
+
+[`responseHeaders`]: /functions/resources/getremote/#responseheaders
+
+###### Status
+
+(`string`) The HTTP status text.
+
+###### StatusCode
+
+(`int`) The HTTP status code.
+
+###### TransferEncoding
+
+(`string`) The transfer encoding.
 
 [`resources.GetRemote`]: /functions/resources/getremote/

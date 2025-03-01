@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -60,6 +61,10 @@ func newGenCommand() *genCommand {
 See https://xyproto.github.io/splash/docs/all.html for a preview of the available styles`,
 
 			run: func(ctx context.Context, cd *simplecobra.Commandeer, r *rootCommand, args []string) error {
+				style = strings.ToLower(style)
+				if !slices.Contains(styles.Names(), style) {
+					return fmt.Errorf("invalid style: %s", style)
+				}
 				builder := styles.Get(style).Builder()
 				if highlightStyle != "" {
 					builder.Add(chroma.LineHighlight, highlightStyle)
@@ -75,7 +80,9 @@ See https://xyproto.github.io/splash/docs/all.html for a preview of the availabl
 					return err
 				}
 				formatter := html.New(html.WithAllClasses(true))
-				formatter.WriteCSS(os.Stdout, style)
+				w := os.Stdout
+				fmt.Fprintf(w, "/* Generated using: hugo %s */\n\n", strings.Join(os.Args[1:], " "))
+				formatter.WriteCSS(w, style)
 				return nil
 			},
 			withc: func(cmd *cobra.Command, r *rootCommand) {
@@ -142,7 +149,7 @@ url: %s
 
 		return &simpleCommand{
 			name:  "doc",
-			short: "Generate Markdown documentation for the Hugo CLI.",
+			short: "Generate Markdown documentation for the Hugo CLI",
 			long: `Generate Markdown documentation for the Hugo CLI.
 			This command is, mostly, used to create up-to-date documentation
 	of Hugo's command-line interface for https://gohugo.io/.
@@ -194,7 +201,7 @@ url: %s
 	newDocsHelper := func() simplecobra.Commander {
 		return &simpleCommand{
 			name:  "docshelper",
-			short: "Generate some data files for the Hugo docs.",
+			short: "Generate some data files for the Hugo docs",
 
 			run: func(ctx context.Context, cd *simplecobra.Commandeer, r *rootCommand, args []string) error {
 				r.Println("Generate docs data to", docsHelperTarget)
@@ -215,7 +222,7 @@ url: %s
 				}
 
 				// Decode the JSON to a map[string]interface{} and then unmarshal it again to the correct format.
-				var m map[string]interface{}
+				var m map[string]any
 				if err := json.Unmarshal(buf.Bytes(), &m); err != nil {
 					return err
 				}

@@ -105,7 +105,7 @@ type PageConfig struct {
 	Cascade []map[string]any
 	Sitemap config.SitemapConfig
 	Build   BuildConfig
-	Menus   []string
+	Menus   any // Can be a string, []string or map[string]any.
 
 	// User defined params.
 	Params maps.Params
@@ -114,9 +114,9 @@ type PageConfig struct {
 	Content Source
 
 	// Compiled values.
-	CascadeCompiled      map[page.PageMatcher]maps.Params
-	ContentMediaType     media.Type `mapstructure:"-" json:"-"`
-	IsFromContentAdapter bool       `mapstructure:"-" json:"-"`
+	CascadeCompiled      *maps.Ordered[page.PageMatcher, maps.Params] `mapstructure:"-" json:"-"`
+	ContentMediaType     media.Type                                   `mapstructure:"-" json:"-"`
+	IsFromContentAdapter bool                                         `mapstructure:"-" json:"-"`
 }
 
 var DefaultPageConfig = PageConfig{
@@ -158,8 +158,11 @@ func (p *PageConfig) Compile(basePath string, pagesFromData bool, ext string, lo
 
 	if p.Params == nil {
 		p.Params = make(maps.Params)
+	} else if pagesFromData {
+		p.Params = maps.PrepareParamsClone(p.Params)
+	} else {
+		maps.PrepareParams(p.Params)
 	}
-	maps.PrepareParams(p.Params)
 
 	if p.Content.Markup == "" && p.Content.MediaType == "" {
 		if ext == "" {
@@ -536,7 +539,7 @@ func expandDefaultValues(values []string, defaults []string) []string {
 
 func toLowerSlice(in any) []string {
 	out := cast.ToStringSlice(in)
-	for i := 0; i < len(out); i++ {
+	for i := range out {
 		out[i] = strings.ToLower(out[i])
 	}
 

@@ -37,7 +37,7 @@ For a complete guide to contributing to Hugo, see the [Contribution Guide].
 [contributing]: CONTRIBUTING.md
 [create a proposal]: https://github.com/gohugoio/hugo/issues/new?labels=Proposal%2C+NeedsTriage&template=feature_request.md
 [documentation repository]: https://github.com/gohugoio/hugoDocs
-[documentation]: https://gohugo.io/documentation
+[documentation]: /documentation
 [forum]: https://discourse.gohugo.io
 [issue queue]: https://github.com/gohugoio/hugo/issues
 [themes]: https://themes.gohugo.io/
@@ -161,7 +161,7 @@ Step 10
 
 ## Building from source
 
-You can build, install, and test Hugo at any point in its development history. The examples below build and install the extended version of Hugo.
+You can build, install, and test Hugo at any point in its development history. The examples below build and install the extended edition of Hugo.
 
 To build and install the latest release:
 
@@ -172,7 +172,7 @@ CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@latest
 To build and install a specific release:
 
 ```sh
-CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@v0.137.1
+CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@v0.141.0
 ```
 
 To build and install at the latest commit on the master branch:

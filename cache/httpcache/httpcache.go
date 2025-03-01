@@ -42,7 +42,7 @@ var DefaultConfig = Config{
 
 // Config holds the configuration for the HTTP cache.
 type Config struct {
-	// Configures the HTTP cache behaviour (RFC 9111).
+	// Configures the HTTP cache behavior (RFC 9111).
 	// When this is not enabled for a resource, Hugo will go straight to the file cache.
 	Cache Cache
 
@@ -52,7 +52,7 @@ type Config struct {
 }
 
 type Cache struct {
-	// Enable HTTP cache behaviour (RFC 9111) for these rsources.
+	// Enable HTTP cache behavior (RFC 9111) for these resources.
 	For GlobMatcher
 }
 
@@ -122,6 +122,10 @@ type GlobMatcher struct {
 	Includes []string
 }
 
+func (gm GlobMatcher) IsZero() bool {
+	return len(gm.Includes) == 0 && len(gm.Excludes) == 0
+}
+
 type ConfigCompiled struct {
 	For         predicate.P[string]
 	PollConfigs []PollConfigCompiled
@@ -155,6 +159,9 @@ func (p PollConfigCompiled) IsZero() bool {
 }
 
 func (gm *GlobMatcher) CompilePredicate() (func(string) bool, error) {
+	if gm.IsZero() {
+		panic("no includes or excludes")
+	}
 	var p predicate.P[string]
 	for _, include := range gm.Includes {
 		g, err := glob.Compile(include, '/')
@@ -201,6 +208,10 @@ func DecodeConfig(bcfg config.BaseConfig, m map[string]any) (Config, error) {
 
 	if err := decoder.Decode(m); err != nil {
 		return c, err
+	}
+
+	if c.Cache.For.IsZero() {
+		c.Cache.For = DefaultConfig.Cache.For
 	}
 
 	return c, nil

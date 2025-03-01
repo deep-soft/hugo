@@ -192,10 +192,6 @@ func (r *resourceAdapter) Content(ctx context.Context) (any, error) {
 	return r.target.Content(ctx)
 }
 
-func (r *resourceAdapter) Err() resource.ResourceError {
-	return nil
-}
-
 func (r *resourceAdapter) GetIdentity() identity.Identity {
 	return identity.FirstIdentity(r.target)
 }
@@ -392,7 +388,6 @@ func (r *resourceAdapter) getImageOps() images.ImageResourceOps {
 		if r.MediaType().SubType == "svg" {
 			panic("this method is only available for raster images. To determine if an image is SVG, you can do {{ if eq .MediaType.SubType \"svg\" }}{{ end }}")
 		}
-		fmt.Println(r.MediaType().SubType)
 		panic("this method is only available for image resources")
 	}
 	r.init(false, false)

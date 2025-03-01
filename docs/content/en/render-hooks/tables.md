@@ -12,13 +12,11 @@ weight: 90
 toc: true
 ---
 
-{{< new-in 0.134.0 >}}
+{{< new-in 0.134.0 />}}
 
 ## Context
 
-Table render hook templates receive the following [context]:
-
-[context]: /getting-started/glossary/#context
+Table render hook templates receive the following [context](g):
 
 ###### Attributes
 

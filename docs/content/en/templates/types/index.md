@@ -17,7 +17,7 @@ aliases: ['/templates/lists/']
 
 ## Structure
 
-Create templates in the layouts directory in the root of your project.
+Create templates in the `layouts` directory in the root of your project.
 
 Although your site may not require each of these templates, the example below is typical for a site of medium complexity.
 
@@ -48,9 +48,7 @@ Hugo's [template lookup order] determines the template path, allowing you to cre
 [template lookup order]: /templates/lookup-order/
 
 {{% note %}}
-You must have thorough understanding of the [template lookup order] when creating templates. Template selection is based on template type, page kind, content type, section, language, and output format.
-
-[template lookup order]: /templates/lookup-order/
+You must have thorough understanding of the template lookup order when creating templates. Template selection is based on template type, page kind, content type, section, language, and output format.
 {{% /note %}}
 
 The purpose of each template type is described below.
@@ -88,9 +86,7 @@ Learn more about [base templates](/templates/base/).
 
 ## Home
 
-A home template renders your site's home page. For a single page site this is the only required template.
-
-For example, the home template below inherits the site's shell from the base template, and renders the home page content with a list of pages.
+A home page template is used to render your site's home page, and is the only template required for a single-page website.  For example, the home page template below inherits the site's shell from the base template and renders the home page content, such as a list of other pages.
 
 {{< code file=layouts/_default/home.html >}}
 {{ define "main" }}
@@ -103,7 +99,7 @@ For example, the home template below inherits the site's shell from the base tem
 
 {{% include "templates/_common/filter-sort-group.md" %}}
 
-Learn more about [home templates](/templates/home/).
+Learn more about [home page templates](/templates/home/).
 
 ## Single
 
@@ -142,9 +138,7 @@ Learn more about [section templates](/templates/section/).
 
 ## Taxonomy
 
-A taxonomy template renders a list of terms in a [taxonomy].
-
-[taxonomy]: /getting-started/glossary/#taxonomy
+A taxonomy template renders a list of terms in a [taxonomy](g).
 
 For example, the taxonomy template below inherits the site's shell from the base template, and renders a list of terms in the current taxonomy.
 
@@ -164,9 +158,7 @@ Learn more about [taxonomy templates](/templates/taxonomy/).
 
 ## Term
 
-A term template renders a list of pages associated with a [term].
-
-[term]: /getting-started/glossary/#term
+A term template renders a list of pages associated with a [term](g).
 
 For example, the term template below inherits the site's shell from the base template, and renders a list of pages associated with the current term.
 
@@ -245,7 +237,7 @@ For example, the render hook template below adds a `rel` attribute to external l
   {{- with .Title }} title="{{ . }}"{{ end -}}
   {{- if $u.IsAbs }} rel="external"{{ end -}}
 >
-  {{- with .Text | safeHTML }}{{ . }}{{ end -}}
+  {{- with .Text }}{{ . }}{{ end -}}
 </a>
 {{- /* chomp trailing newline */ -}}
 {{< /code >}}
@@ -256,9 +248,7 @@ Learn more about [render hook templates](/render-hooks/).
 
 A shortcode template is used to render a component of your site. Unlike partial templates, shortcode templates are called from content pages.
 
-For example, the shortcode template below renders an audio element from a [global resource].
-
-[global resource]: /getting-started/glossary/#global-resource
+For example, the shortcode template below renders an audio element from a [global resource](g).
 
 {{< code file=layouts/shortcodes/audio.html >}}
 {{ with resources.Get (.Get "src") }}
@@ -266,10 +256,10 @@ For example, the shortcode template below renders an audio element from a [globa
 {{ end }}
 {{< /code >}}
 
-Call the shortcode from your content page:
+Then call the shortcode from within markup:
 
 {{< code file=content/example.md >}}
-{{</* audio src="audio/test.mp3" */>}}
+{{</* audio src=/audio/test.mp3 */>}}
 {{< /code >}}
 
 Learn more about [shortcode templates](/templates/shortcode/).
