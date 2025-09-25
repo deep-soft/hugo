@@ -3,19 +3,11 @@ title: resources.GetRemote
 description: Returns a remote resource from the given URL, or nil if none found.
 categories: []
 keywords: []
-action:
-  aliases: []
-  related:
-    - functions/data/GetCSV
-    - functions/data/GetJSON
-    - functions/resources/ByType
-    - functions/resources/Get
-    - functions/resources/GetMatch
-    - functions/resources/Match
-    - methods/page/Resources
-  returnType: resource.Resource
-  signatures: ['resources.GetRemote URL [OPTIONS]']
-toc: true
+params:
+  functions_and_methods:
+    aliases: []
+    returnType: resource.Resource
+    signatures: ['resources.GetRemote URL [OPTIONS]']
 ---
 
 {{< new-in 0.141.0 >}}
@@ -23,8 +15,6 @@ The `Err` method on the returned resource was removed in v0.141.0.
 
 Use the [`try`] statement instead, as shown in the [error handling] example below.
 
-[`try`]: /functions/go-template/try
-[error handling]: #error-handling
 {{< /new-in >}}
 
 ```go-html-template
@@ -44,36 +34,28 @@ Use the [`try`] statement instead, as shown in the [error handling] example belo
 
 The `resources.GetRemote` function takes an optional map of options.
 
-###### body
+body
+: (`string`) The data you want to transmit to the server.
 
-(`string`) The data you want to transmit to the server.
+headers
+: (`map[string][]string`) The collection of key-value pairs that provide additional information about the request.
 
-###### headers
+key
+: (`string`) The cache key. Hugo derives the default value from the URL and options map. See [caching](#caching).
 
-(`map[string][]string`) The collection of key-value pairs that provide additional information about the request.
+method
+: (`string`) The action to perform on the requested resource, typically one of `GET`, `POST`, or `HEAD`.
 
-###### key
-
-(`string`) The cache key. Hugo derives the default value from the URL and options map. See [caching](#caching).
-
-###### method
-
-(`string`) The action to perform on the requested resource, typically one of `GET`, `POST`, or `HEAD`.
-
-###### responseHeaders
-{{< new-in 0.143.0 />}}
-
-(`[]string`) The headers to extract from the server's response, accessible through the resource's [`Data.Headers`] method. Header name matching is case-insensitive.
+responseHeaders
+: {{< new-in 0.143.0 />}}
+: (`[]string`) The headers to extract from the server's response, accessible through the resource's [`Data.Headers`] method. Header name matching is case-insensitive.
 
 [`Data.Headers`]: /methods/resource/data/#headers
 
 ## Options examples
 
-{{% note %}}
-For brevity, the examples below do not include [error handling].
-
-[error handling]: #error-handling
-{{% /note %}}
+> [!note]
+> For brevity, the examples below do not include [error handling].
 
 To include a header:
 
@@ -148,25 +130,19 @@ When retrieving remote data, use the [`transform.Unmarshal`] function to [unmars
 {{ end }}
 ```
 
-{{% note %}}
-When retrieving remote data, a misconfigured server may send a response header with an incorrect [Content-Type]. For example, the server may set the Content-Type header to `application/octet-stream` instead of `application/json`.
-
-In these cases, pass the resource `Content` through the `transform.Unmarshal` function instead of passing the resource itself. For example, in the above, do this instead:
-
-`{{ $data = .Content | transform.Unmarshal }}`
-
-[Content-Type]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-{{% /note %}}
+> [!note]
+> When retrieving remote data, a misconfigured server may send a response header with an incorrect [Content-Type]. For example, the server may set the Content-Type header to `application/octet-stream` instead of `application/json`.
+>
+> In these cases, pass the resource `Content` through the `transform.Unmarshal` function instead of passing the resource itself. For example, in the above, do this instead:
+>
+> `{{ $data = .Content | transform.Unmarshal }}`
 
 ## Error handling
 
 Use the [`try`] statement to capture HTTP request errors. If you do not handle the error yourself, Hugo will fail the build.
 
-[`try`]: /functions/go-template/try
-
-{{% note %}}
-Hugo does not classify an HTTP response with status code 404 as an error. In this case `resources.GetRemote` returns nil.
-{{% /note %}}
+> [!note]
+> Hugo does not classify an HTTP response with status code 404 as an error. In this case `resources.GetRemote` returns nil.
 
 ```go-html-template
 {{ $url := "https://broken-example.org/images/a.jpg" }}
@@ -206,9 +182,7 @@ The [`Data`] method on a resource returned by the `resources.GetRemote` function
 
 Resources returned from `resources.GetRemote` are cached to disk. See [configure file caches] for details.
 
-By default, Hugo derives the cache key from the arguments passed to the function, the URL and the options map, if any.
-
-Override the cache key by setting a `key` in the options map. Use this approach to have more control over how often Hugo fetches a remote resource.
+By default, Hugo derives the cache key from the arguments passed to the function. Override the cache key by setting a `key` in the options map. Use this approach to have more control over how often Hugo fetches a remote resource.
 
 ```go-html-template
 {{ $url := "https://example.org/images/a.jpg" }}
@@ -216,8 +190,6 @@ Override the cache key by setting a `key` in the options map. Use this approach 
 {{ $opts := dict "key" $cacheKey }}
 {{ $resource := resources.GetRemote $url $opts }}
 ```
-
-[configure file caches]: /getting-started/configuration/#configure-file-caches
 
 ## Security
 
@@ -245,7 +217,11 @@ mediaTypes = ['^image/avif$','^application/vnd\.api\+json$']
 Note that the entry above is:
 
 - An _addition_ to the allowlist; it does not _replace_ the allowlist
-- An array of regular expressions
+- An array of [regular expressions](g)
 
 [allowlist]: https://en.wikipedia.org/wiki/Whitelist
 [Content-Type]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+
+[`try`]: /functions/go-template/try
+[configure file caches]: /configuration/caches/
+[error handling]: #error-handling

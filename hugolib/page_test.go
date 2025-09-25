@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/bep/clocks"
+	"github.com/gohugoio/hugo/htesting"
 	"github.com/gohugoio/hugo/markup/asciidocext"
 	"github.com/gohugoio/hugo/markup/rst"
 	"github.com/gohugoio/hugo/tpl"
@@ -368,7 +369,7 @@ func testAllMarkdownEnginesForPages(t *testing.T,
 	}{
 		{"md", func() bool { return true }},
 		{"ad", func() bool { return asciidocext.Supports() }},
-		{"rst", func() bool { return rst.Supports() }},
+		{"rst", func() bool { return !htesting.IsRealCI() && rst.Supports() }},
 	}
 
 	for _, e := range engines {
@@ -1967,4 +1968,36 @@ Title: {{ .Title }}
 		"deprecated: lang in front matter was deprecated",
 		"deprecated: path in front matter was deprecated",
 	)
+}
+
+// Issue 13538
+func TestHomePageIsLeafBundle(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+defaultContentLanguage = 'de'
+defaultContentLanguageInSubdir = true
+[languages.de]
+weight = 1
+[languages.en]
+weight = 2
+-- layouts/all.html --
+{{ .Title }}
+-- content/index.de.md --
+---
+title: home de
+---
+-- content/index.en.org --
+---
+title: home en
+---
+`
+
+	b := Test(t, files, TestOptWarn())
+
+	b.AssertFileContent("public/de/index.html", "home de")
+	b.AssertFileContent("public/en/index.html", "home en")
+	b.AssertLogContains("Using index.de.md in your content's root directory is usually incorrect for your home page. You should use _index.de.md instead.")
+	b.AssertLogContains("Using index.en.org in your content's root directory is usually incorrect for your home page. You should use _index.en.org instead.")
 }

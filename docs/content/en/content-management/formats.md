@@ -1,14 +1,8 @@
 ---
 title: Content formats
 description: Create your content using Markdown, HTML, Emacs Org Mode, AsciiDoc, Pandoc, or reStructuredText.
-categories: [content management]
-keywords: [markdown,asciidoc,pandoc,content format]
-menu:
-  docs:
-    parent: content-management
-    weight: 40
-weight: 40
-toc: true
+categories: []
+keywords: []
 aliases: [/content/markdown-extras/,/content/supported-formats/,/doc/supported-formats/]
 ---
 
@@ -58,13 +52,13 @@ Hugo provides custom Markdown features including:
 
 [Attributes]: /content-management/markdown-attributes/
 [CommonMark]: https://spec.commonmark.org/current/
-[Extensions]: /getting-started/configuration-markup/#goldmark-extensions
+[Extensions]: /configuration/markup/#extensions
 [GitHub Flavored Markdown]: https://github.github.com/gfm/
 [Goldmark]: https://github.com/yuin/goldmark
 [Markdown]: https://daringfireball.net/projects/markdown/
 [Mathematics]: /content-management/mathematics/
 [Render hooks]: /render-hooks/introduction/
-[configure goldmark]: /getting-started/configuration-markup/#goldmark
+[configure goldmark]: /configuration/markup/#goldmark
 
 ### HTML
 
@@ -81,7 +75,7 @@ Create your content in the [Emacs Org Mode] format preceded by front matter. You
 
 ### AsciiDoc
 
-Create your content in the [AsciiDoc] format preceded by front matter. Hugo renders AsciiDoc content to HTML using the Asciidoctor executable. You must install Asciidoctor and its dependencies (Ruby) to use the AsciiDoc content format.
+Create your content in the [AsciiDoc] format preceded by front matter. Hugo renders AsciiDoc content to HTML using the Asciidoctor executable. You must install Asciidoctor and its dependencies (Ruby) to render the AsciiDoc content format.
 
 You can configure the AsciiDoc renderer in your [site configuration][configure asciidoc].
 
@@ -98,12 +92,13 @@ hugo --logLevel info
 ```
 
 [AsciiDoc]: https://asciidoc.org/
-[configure the AsciiDoc renderer]: /getting-started/configuration-markup/#asciidoc
-[configure asciidoc]: /getting-started/configuration-markup/#asciidoc
+[configure asciidoc]: /configuration/markup/#asciidoc
 
 ### Pandoc
 
-Create your content in the [Pandoc] format preceded by front matter. Hugo renders Pandoc content to HTML using the Pandoc executable. You must install Pandoc to use the Pandoc content format.
+Create your content in the [Pandoc] format[^1] preceded by front matter. Hugo renders Pandoc content to HTML using the Pandoc executable. You must install Pandoc to render the Pandoc content format.
+
+[^1]: This is a derivation of the Markdown format as described by the CommonMark specification.
 
 Hugo passes these CLI flags when calling the Pandoc executable:
 
@@ -111,11 +106,11 @@ Hugo passes these CLI flags when calling the Pandoc executable:
 --mathjax
 ```
 
-[Pandoc]: https://pandoc.org/
+[Pandoc]: https://pandoc.org/MANUAL.html#pandocs-markdown
 
 ### reStructuredText
 
-Create your content in the [reStructuredText] format preceded by front matter. Hugo renders reStructuredText content to HTML using [Docutils], specifically rst2html. You must install Docutils and its dependencies (Python) to use the reStructuredText content format.
+Create your content in the [reStructuredText] format preceded by front matter. Hugo renders reStructuredText content to HTML using [Docutils], specifically rst2html. You must install Docutils and its dependencies (Python) to render the reStructuredText content format.
 
 Hugo passes these CLI flags when calling the rst2html executable:
 
@@ -128,14 +123,7 @@ Hugo passes these CLI flags when calling the rst2html executable:
 
 ## Classification
 
-Content format|Media type|Identifier|File extensions
-:--|:--|:--|:--
-Markdown|`text/markdown`|`markdown`|`markdown`,`md`, `mdown`
-HTML|`text/html`|`html`|`htm`, `html`
-Emacs Org Mode|`text/org`|`org`|`org`
-AsciiDoc|`text/asciidoc`|`asciidoc`|`ad`, `adoc`, `asciidoc`
-Pandoc|`text/pandoc`|`pandoc`|`pandoc`, `pdc`
-reStructuredText|`text/rst`|`rst`|`rst`
+{{% include "/_common/content-format-table.md" %}}
 
 When converting content to HTML, Hugo uses:
 

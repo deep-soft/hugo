@@ -20,13 +20,27 @@ import (
 // Cache is a simple thread safe cache backed by a map.
 type Cache[K comparable, T any] struct {
 	m                  map[K]T
+	opts               CacheOptions
 	hasBeenInitialized bool
 	sync.RWMutex
 }
 
-// NewCache creates a new Cache.
+// CacheOptions are the options for the Cache.
+type CacheOptions struct {
+	// If set, the cache will not grow beyond this size.
+	Size uint64
+}
+
+var defaultCacheOptions = CacheOptions{}
+
+// NewCache creates a new Cache with default options.
 func NewCache[K comparable, T any]() *Cache[K, T] {
-	return &Cache[K, T]{m: make(map[K]T)}
+	return &Cache[K, T]{m: make(map[K]T), opts: defaultCacheOptions}
+}
+
+// NewCacheWithOptions creates a new Cache with the given options.
+func NewCacheWithOptions[K comparable, T any](opts CacheOptions) *Cache[K, T] {
+	return &Cache[K, T]{m: make(map[K]T), opts: opts}
 }
 
 // Delete deletes the given key from the cache.
@@ -65,8 +79,17 @@ func (c *Cache[K, T]) GetOrCreate(key K, create func() (T, error)) (T, error) {
 	if err != nil {
 		return v, err
 	}
+	c.clearIfNeeded()
 	c.m[key] = v
 	return v, nil
+}
+
+// Contains returns whether the given key exists in the cache.
+func (c *Cache[K, T]) Contains(key K) bool {
+	c.RLock()
+	_, found := c.m[key]
+	c.RUnlock()
+	return found
 }
 
 // InitAndGet initializes the cache if not already done and returns the value for the given key.
@@ -108,7 +131,26 @@ func (c *Cache[K, T]) Set(key K, value T) {
 	c.Unlock()
 }
 
+// SetIfAbsent sets the given key to the given value if the key does not already exist in the cache.
+func (c *Cache[K, T]) SetIfAbsent(key K, value T) {
+	c.RLock()
+	if _, found := c.get(key); !found {
+		c.RUnlock()
+		c.Set(key, value)
+	} else {
+		c.RUnlock()
+	}
+}
+
+func (c *Cache[K, T]) clearIfNeeded() {
+	if c.opts.Size > 0 && uint64(len(c.m)) >= c.opts.Size {
+		// clear the map
+		clear(c.m)
+	}
+}
+
 func (c *Cache[K, T]) set(key K, value T) {
+	c.clearIfNeeded()
 	c.m[key] = value
 }
 
@@ -141,7 +183,7 @@ func (c *Cache[K, T]) Len() int {
 
 func (c *Cache[K, T]) Reset() {
 	c.Lock()
-	c.m = make(map[K]T)
+	clear(c.m)
 	c.hasBeenInitialized = false
 	c.Unlock()
 }

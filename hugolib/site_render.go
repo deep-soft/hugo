@@ -23,9 +23,9 @@ import (
 	"github.com/bep/logg"
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/hugolib/doctree"
+	"github.com/gohugoio/hugo/tpl/tplimpl"
 
 	"github.com/gohugoio/hugo/config"
-	"github.com/gohugoio/hugo/tpl"
 
 	"github.com/gohugoio/hugo/resources/kinds"
 	"github.com/gohugoio/hugo/resources/page"
@@ -57,7 +57,7 @@ func (s siteRenderContext) shouldRenderStandalonePage(kind string) bool {
 		return s.outIdx == 0
 	}
 
-	if kind == kinds.KindStatus404 {
+	if kind == kinds.KindTemporary || kind == kinds.KindStatus404 {
 		// 1 for all output formats
 		return s.outIdx == 0
 	}
@@ -225,7 +225,7 @@ func (s *Site) logMissingLayout(name, layout, kind, outputFormat string) {
 }
 
 // renderPaginator must be run after the owning Page has been rendered.
-func (s *Site) renderPaginator(p *pageState, templ tpl.Template) error {
+func (s *Site) renderPaginator(p *pageState, templ *tplimpl.TemplInfo) error {
 	paginatePath := s.Conf.Pagination().Path
 
 	d := p.targetPathDescriptor

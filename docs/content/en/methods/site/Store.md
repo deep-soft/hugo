@@ -3,14 +3,10 @@ title: Store
 description: Returns a "scratch pad" to store and manipulate data, scoped to the current site.
 categories: []
 keywords: []
-action:
-  related:
-  - methods/page/store
-  - functions/hugo/store
-  - functions/collections/NewScratch
-  returnType: maps.Scratch
-  signatures: [site.Store]
-toc: true
+params:
+  functions_and_methods:
+    returnType: maps.Scratch
+    signatures: [site.Store]
 ---
 
 {{< new-in 0.139.0 />}}
@@ -19,7 +15,7 @@ Use the `Store` method on a `Site` object to create a [scratch pad](g) to store 
 
 ## Methods
 
-###### Set
+### Set
 
 Sets the value of a given key.
 
@@ -27,7 +23,7 @@ Sets the value of a given key.
 {{ site.Store.Set "greeting" "Hello" }}
 ```
 
-###### Get
+### Get
 
 Gets the value of a given key.
 
@@ -36,7 +32,7 @@ Gets the value of a given key.
 {{ site.Store.Get "greeting" }} → Hello
 ```
 
-###### Add
+### Add
 
 Adds a given value to existing value(s) of the given key.
 
@@ -58,9 +54,9 @@ For single values, `Add` accepts values that support Go's `+` operator. If the f
 {{ site.Store.Set "greetings" (slice "Hello") }}
 {{ site.Store.Add "greetings" (slice "Welcome" "Cheers") }}
 {{ site.Store.Get "greetings" }} → [Hello Welcome Cheers]
-```
+  ```
 
-###### SetInMap
+### SetInMap
 
 Takes a `key`, `mapKey` and `value` and adds a map of `mapKey` and `value` to the given `key`.
 
@@ -70,7 +66,7 @@ Takes a `key`, `mapKey` and `value` and adds a map of `mapKey` and `value` to th
 {{ site.Store.Get "greetings" }} → map[english:Hello french:Bonjour]
 ```
 
-###### DeleteInMap
+### DeleteInMap
 
 Takes a `key` and `mapKey` and removes the map of `mapKey` from the given `key`.
 
@@ -81,7 +77,7 @@ Takes a `key` and `mapKey` and removes the map of `mapKey` from the given `key`.
 {{ site.Store.Get "greetings" }} → map[french:Bonjour]
 ```
 
-###### GetSortedMapValues
+### GetSortedMapValues
 
 Returns an array of values from `key` sorted by `mapKey`.
 
@@ -91,7 +87,7 @@ Returns an array of values from `key` sorted by `mapKey`.
 {{ site.Store.GetSortedMapValues "greetings" }} → [Hello Bonjour]
 ```
 
-###### Delete
+### Delete
 
 Removes the given key.
 
@@ -104,7 +100,7 @@ Removes the given key.
 
 ## Determinate values
 
-The `Store` method is often used to set scratch pad values within a shortcode, a partial template called by a shortcode, or by a Markdown render hook. In all three cases, the scratch pad values are indeterminate until Hugo renders the page content.
+The `Store` method is often used to set scratch pad values within a _shortcode_ template, a _partial_ template called by a _shortcode_ template, or by a _render hook_ template. In all three cases, the scratch pad values are indeterminate until Hugo renders the page content.
 
 If you need to access a scratch pad value from a parent template, and the parent template has not yet rendered the page content, you can trigger content rendering by assigning the returned value to a [noop](g) variable:
 

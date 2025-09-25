@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/gohugoio/hugo/htesting/hqt"
 	"github.com/gohugoio/hugo/hugolib"
 )
@@ -229,11 +230,11 @@ An inline {{< highlight go "hl_inline=true" >}}fmt.Println("Value of i:", i)Hell
 	b := hugolib.Test(t, files)
 
 	b.AssertFileContent("public/p1/index.html", "576ee13be18ddba2")
-	b.AssertFileContent("public/p2/index.html", "8774e8b4bf60aa9e")
+	b.AssertFileContent("public/p2/index.html", "a9a4ec6ce77d7a23")
 	b.AssertFileContent("public/p3/index.html", "7634b47df1859f58")
 	b.AssertFileContent("public/p4/index.html", "385a15e400df4e39")
-	b.AssertFileContent("public/p5/index.html", "b3a73f3eddc6e0c1")
-	b.AssertFileContent("public/p6/index.html", "b3a73f3eddc6e0c1")
+	b.AssertFileContent("public/p5/index.html", "f69c99d2d7f786d4")
+	b.AssertFileContent("public/p6/index.html", "f69c99d2d7f786d4")
 	b.AssertFileContent("public/p7/index.html", "f12eeaa4d6d9c7ac")
 }
 
@@ -464,26 +465,38 @@ func TestVimeoShortcode(t *testing.T) {
 
 	files := `
 -- hugo.toml --
-disableKinds = ['page','rss','section','sitemap','taxonomy','term']
+disableKinds = ['home','rss','section','sitemap','taxonomy','term']
 privacy.vimeo.simple = false
--- content/_index.md --
+-- content/p1.md --
 ---
-title: home
+title: p1
 ---
 {{< vimeo 55073825 >}}
--- layouts/index.html --
+-- content/p2.md --
+---
+title: p2
+---
+{{< vimeo id=55073825 allowFullScreen=true >}}
+-- content/p3.md --
+---
+title: p3
+---
+{{< vimeo id=55073825 allowFullScreen=false >}}
+-- layouts/_default/single.html --
 Hash: {{ .Content | hash.XxHash }}
 Content: {{ .Content }}
 `
 
 	// Regular mode
 	b := hugolib.Test(t, files)
-	b.AssertFileContent("public/index.html", "d5b2a079cc37d0ed")
+	b.AssertFileContent("public/p1/index.html", "82566e6b8d04b53e")
+	b.AssertFileContent("public/p2/index.html", "82566e6b8d04b53e")
+	b.AssertFileContent("public/p3/index.html", "2b5f9cc3167d1336")
 
 	// Simple mode
 	files = strings.ReplaceAll(files, "privacy.vimeo.simple = false", "privacy.vimeo.simple = true")
 	b = hugolib.Test(t, files)
-	b.AssertFileContent("public/index.html", "73b8767ce8bdf694")
+	b.AssertFileContent("public/p1/index.html", "04d861fc957ee638")
 
 	// Simple mode with non-existent id
 	files = strings.ReplaceAll(files, "{{< vimeo 55073825 >}}", "{{< vimeo __id_does_not_exist__ >}}")
@@ -675,12 +688,109 @@ title: p2
 
 	b := hugolib.Test(t, files)
 
-	b.AssertFileContent("public/p1/index.html", "a0a6f5ade9cc3a9f")
+	b.AssertFileContent("public/p1/index.html", "4b54bf9bd03946ec")
 	b.AssertFileContent("public/p2/index.html", "289c655e727e596c")
 
 	files = strings.ReplaceAll(files, "privacy.youtube.privacyEnhanced = false", "privacy.youtube.privacyEnhanced = true")
 
 	b = hugolib.Test(t, files)
-	b.AssertFileContent("public/p1/index.html", "b76d790c20d2bd04")
+	b.AssertFileContent("public/p1/index.html", "78eb19b5c6f3768f")
 	b.AssertFileContent("public/p2/index.html", "a6db910a9cf54bc1")
+}
+
+func TestShortcodePlainTextVsHTMLTemplateIssue13698(t *testing.T) {
+	t.Parallel()
+
+	filesTemplate := `
+-- hugo.toml --
+markup.goldmark.renderer.unsafe = true
+-- layouts/all.html --
+Content: {{ .Content }}|
+-- layouts/_shortcodes/mymarkdown.md --
+<div>Foo bar</div>
+-- content/p1.md --
+---
+title: p1
+---
+## A shortcode
+
+SHORTCODE
+
+`
+
+	files := strings.ReplaceAll(filesTemplate, "SHORTCODE", "{{% mymarkdown %}}")
+	b := hugolib.Test(t, files)
+	b.AssertFileContent("public/p1/index.html", "<div>Foo bar</div>")
+
+	files = strings.ReplaceAll(filesTemplate, "SHORTCODE", "{{< mymarkdown >}}")
+
+	var err error
+	b, err = hugolib.TestE(t, files)
+	b.Assert(err, qt.IsNotNil)
+	b.Assert(err.Error(), qt.Contains, `no compatible template found for shortcode "mymarkdown" in [/_shortcodes/mymarkdown.md]; note that to use plain text template shortcodes in HTML you need to use the shortcode {{% delimiter`)
+}
+
+func TestShortcodeOnlyLanguageInBaseIssue13699And13740(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+baseURL = 'https://example.org/'
+disableLanguages = ['de']
+[languages]
+[languages.en]
+weight = 1
+[languages.de]
+weight = 2
+-- layouts/_shortcodes/de.html --
+de.html
+-- layouts/all.html --
+{{ .Content }}
+-- content/_index.md --
+---
+title: home
+---
+{{< de >}}
+
+`
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/index.html", "de.html")
+}
+
+func TestShortcodeLanguage13767(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+defaultContentLanguage = 'pl'
+defaultContentLanguageInSubdir = true
+[languages.pl]
+weight = 1
+[languages.en]
+weight = 2	
+-- content/_index.md --
+---
+title: dom
+---
+{{< myshortcode >}}
+-- content/_index.en.md --
+---
+title: home
+---
+{{< myshortcode >}}
+-- layouts/_shortcodes/myshortcode.html --
+myshortcode.html
+-- layouts/_shortcodes/myshortcode.en.html --
+myshortcode.en.html
+-- layouts/all.html --
+{{ .Content }}
+
+
+`
+
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/pl/index.html", "myshortcode.html")
+	b.AssertFileContent("public/en/index.html", "myshortcode.en.html")
 }

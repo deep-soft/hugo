@@ -379,3 +379,159 @@ Markdown: {{ $markdown }}|
 
 	b.AssertFileContent("public/index.html", "Markdown: ## Heading 2\n|")
 }
+
+func TestUnmarshalCSV(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['page','rss','section','sitemap','taxonomy','term']
+-- layouts/all.html --
+{{ $opts := OPTS }}
+{{ with resources.Get "pets.csv" | transform.Unmarshal $opts }}
+  {{ jsonify . }}
+{{ end }}
+-- assets/pets.csv --
+DATA
+`
+
+	// targetType = map
+	f := strings.ReplaceAll(files, "OPTS", `dict "targetType" "map"`)
+	f = strings.ReplaceAll(f, "DATA",
+		"name,type,breed,age\nSpot,dog,Collie,3\nFelix,cat,Malicious,7",
+	)
+	b := hugolib.Test(t, f)
+	b.AssertFileContent("public/index.html",
+		`[{"age":"3","breed":"Collie","name":"Spot","type":"dog"},{"age":"7","breed":"Malicious","name":"Felix","type":"cat"}]`,
+	)
+
+	// targetType = map (no data)
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "map"`)
+	f = strings.ReplaceAll(f, "DATA", "")
+	b = hugolib.Test(t, f)
+	b.AssertFileContent("public/index.html", "")
+
+	// targetType = slice
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "slice"`)
+	f = strings.ReplaceAll(f, "DATA",
+		"name,type,breed,age\nSpot,dog,Collie,3\nFelix,cat,Malicious,7",
+	)
+	b = hugolib.Test(t, f)
+	b.AssertFileContent("public/index.html",
+		`[["name","type","breed","age"],["Spot","dog","Collie","3"],["Felix","cat","Malicious","7"]]`,
+	)
+
+	// targetType = slice (no data)
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "slice"`)
+	f = strings.ReplaceAll(f, "DATA", "")
+	b = hugolib.Test(t, f)
+	b.AssertFileContent("public/index.html", "")
+
+	// targetType not specified
+	f = strings.ReplaceAll(files, "OPTS", "dict")
+	f = strings.ReplaceAll(f, "DATA",
+		"name,type,breed,age\nSpot,dog,Collie,3\nFelix,cat,Malicious,7",
+	)
+	b = hugolib.Test(t, f)
+	b.AssertFileContent("public/index.html",
+		`[["name","type","breed","age"],["Spot","dog","Collie","3"],["Felix","cat","Malicious","7"]]`,
+	)
+
+	// targetType not specified (no data)
+	f = strings.ReplaceAll(files, "OPTS", "dict")
+	f = strings.ReplaceAll(f, "DATA", "")
+	b = hugolib.Test(t, f)
+	b.AssertFileContent("public/index.html", "")
+
+	// targetType = foo
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "foo"`)
+	_, err := hugolib.TestE(t, f)
+	if err == nil {
+		t.Errorf("expected error")
+	} else {
+		if !strings.Contains(err.Error(), `invalid targetType: expected either slice or map, received foo`) {
+			t.Log(err.Error())
+			t.Errorf("error message does not match expected error message")
+		}
+	}
+
+	// targetType = foo (no data)
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "foo"`)
+	f = strings.ReplaceAll(f, "DATA", "")
+	_, err = hugolib.TestE(t, f)
+	if err == nil {
+		t.Errorf("expected error")
+	} else {
+		if !strings.Contains(err.Error(), `invalid targetType: expected either slice or map, received foo`) {
+			t.Log(err.Error())
+			t.Errorf("error message does not match expected error message")
+		}
+	}
+
+	// targetType = map (error: expected at least a header row and one data row)
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "map"`)
+	_, err = hugolib.TestE(t, f)
+	if err == nil {
+		t.Errorf("expected error")
+	} else {
+		if !strings.Contains(err.Error(), `expected at least a header row and one data row`) {
+			t.Log(err.Error())
+			t.Errorf("error message does not match expected error message")
+		}
+	}
+
+	// targetType = map (error: header row contains duplicate field names)
+	f = strings.ReplaceAll(files, "OPTS", `dict "targetType" "map"`)
+	f = strings.ReplaceAll(f, "DATA",
+		"name,name,breed,age\nSpot,dog,Collie,3\nFelix,cat,Malicious,7",
+	)
+	_, err = hugolib.TestE(t, f)
+	if err == nil {
+		t.Errorf("expected error")
+	} else {
+		if !strings.Contains(err.Error(), `header row contains duplicate field names`) {
+			t.Log(err.Error())
+			t.Errorf("error message does not match expected error message")
+		}
+	}
+}
+
+// Issue 13729
+func TestToMathStrictMode(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['page','rss','section','sitemap','taxonomy','term']
+-- layouts/all.html --
+{{ transform.ToMath "a %" dict }}
+-- foo --
+`
+
+	// strict mode: default
+	f := strings.ReplaceAll(files, "dict", "")
+	b, err := hugolib.TestE(t, f)
+	b.Assert(err.Error(), qt.Contains, "[commentAtEnd]")
+
+	// strict mode: error
+	f = strings.ReplaceAll(files, "dict", `(dict "strict" "error")`)
+	b, err = hugolib.TestE(t, f)
+	b.Assert(err.Error(), qt.Contains, "[commentAtEnd]")
+
+	// strict mode: ignore
+	f = strings.ReplaceAll(files, "dict", `(dict "strict" "ignore")`)
+	b = hugolib.Test(t, f, hugolib.TestOptWarn())
+	b.AssertLogMatches("")
+	b.AssertFileContent("public/index.html", `<annotation encoding="application/x-tex">a %</annotation>`)
+
+	// strict: warn
+	f = strings.ReplaceAll(files, "dict", `(dict "strict" "warn")`)
+	b = hugolib.Test(t, f, hugolib.TestOptWarn())
+	b.AssertLogMatches("[commentAtEnd]")
+	b.AssertFileContent("public/index.html", `<annotation encoding="application/x-tex">a %</annotation>`)
+
+	// strict mode: invalid value
+	f = strings.ReplaceAll(files, "dict", `(dict "strict" "foo")`)
+	b, err = hugolib.TestE(t, f)
+	b.Assert(err.Error(), qt.Contains, "invalid strict mode")
+}

@@ -2,14 +2,9 @@
 title: Front-end interfaces
 linkTitle: Front-ends
 description: Do you prefer a graphical user interface over a text editor? Give these front-ends a try.
-categories: [developer tools]
-keywords: [frontend, gui]
-menu:
-  docs:
-    parent: developer-tools
-    weight: 30
-weight: 30
-toc: true
+categories: []
+keywords: []
+weight: 20
 aliases: [/tools/frontends/]
 ---
 
@@ -23,6 +18,9 @@ aliases: [/tools/frontends/]
 
 [PubCrank](https://www.pubcrank.com/)
 : PubCrank is a static site editor which lets you define templates for different front matter layouts in your site. This gives writers an easy-to-use visual interface to create and edit content while maintaining the guardrails that the developer has created. PubCrank is free for local editing.
+
+[Sitepins](https://sitepins.com)
+: Sitepins is a Git-based CMS built for static site generators like Hugo. It offers a clean visual editor, media management, role-based permissions, shortcode support, and more. To get started, simply connect your GitHub repository, configure your content folders, and start visually editing your Hugo site with Sitepins.
 
 ## Open-source
 

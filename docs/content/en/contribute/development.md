@@ -1,14 +1,8 @@
 ---
 title: Development
 description: Contribute to the development of Hugo.
-categories: [contribute]
-keywords: [development]
-menu:
-  docs:
-    parent: contribute
-    weight: 20
-weight: 20
-toc: true
+categories: []
+keywords: []
 ---
 
 ## Introduction
@@ -33,16 +27,6 @@ If there is sufficient interest, [create a proposal]. Do not submit a pull reque
 
 For a complete guide to contributing to Hugo, see the [Contribution Guide].
 
-[bugs]: https://github.com/gohugoio/hugo/issues?q=is%3Aopen+is%3Aissue+label%3ABug
-[contributing]: CONTRIBUTING.md
-[create a proposal]: https://github.com/gohugoio/hugo/issues/new?labels=Proposal%2C+NeedsTriage&template=feature_request.md
-[documentation repository]: https://github.com/gohugoio/hugoDocs
-[documentation]: /documentation
-[forum]: https://discourse.gohugo.io
-[issue queue]: https://github.com/gohugoio/hugo/issues
-[themes]: https://themes.gohugo.io/
-[contribution guide]: https://github.com/gohugoio/hugo/blob/master/CONTRIBUTING.md
-
 ## Prerequisites
 
 To build the extended or extended/deploy edition from source you must:
@@ -52,28 +36,18 @@ To build the extended or extended/deploy edition from source you must:
 1. Install a C compiler, either [GCC] or [Clang]
 1. Update your `PATH` environment variable as described in the [Go documentation]
 
-[Clang]: https://clang.llvm.org/
-[GCC]: https://gcc.gnu.org/
-[Git]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
-[Go documentation]: https://go.dev/doc/code#Command
-[Go]: https://go.dev/doc/install
-
-{{% note %}}
-See these [detailed instructions](https://discourse.gohugo.io/t/41370) to install GCC on Windows.
-{{% /note %}}
+> [!note]
+> See these [detailed instructions](https://discourse.gohugo.io/t/41370) to install GCC on Windows.
 
 ## GitHub workflow
 
-{{% note %}}
-This section assumes that you have a working knowledge of Go, Git and GitHub, and are comfortable working on the command line.
-{{% /note %}}
+> [!note]
+> This section assumes that you have a working knowledge of Go, Git and GitHub, and are comfortable working on the command line.
 
 Use this workflow to create and submit pull requests.
 
 Step 1
 : Fork the [project repository].
-
-[project repository]: https://github.com/gohugoio/hugo/
 
 Step 2
 : Clone your fork.
@@ -81,17 +55,17 @@ Step 2
 Step 3
 : Create a new branch with a descriptive name that includes the corresponding issue number.
 
-For a new feature:
+  For a new feature:
 
-```sh
-git checkout -b feat/implement-some-feature-99999
-```
+  ```sh
+  git checkout -b feat/implement-some-feature-99999
+  ```
 
-For a bug fix:
+  For a bug fix:
 
-```sh
-git checkout -b fix/fix-some-bug-99999
-```
+  ```sh
+  git checkout -b fix/fix-some-bug-99999
+  ```
 
 Step 4
 : Make changes.
@@ -99,56 +73,53 @@ Step 4
 Step 5
 : Compile and install.
 
-To compile and install the standard edition:
+  To compile and install the standard edition:
 
-```text
-go install
-```
+  ```text
+  go install
+  ```
 
-To compile and install the extended edition:
+  To compile and install the extended edition:
 
-```text
-CGO_ENABLED=1 go install -tags extended
-```
+  ```text
+  CGO_ENABLED=1 go install -tags extended
+  ```
 
-To compile and install the extended/deploy edition:
+  To compile and install the extended/deploy edition:
 
-```text
-CGO_ENABLED=1 go install -tags extended,withdeploy
-```
+  ```text
+  CGO_ENABLED=1 go install -tags extended,withdeploy
+  ```
 
 Step 6
 : Test your changes:
 
-```text
-go test ./...
-```
+  ```text
+  go test ./...
+  ```
 
 Step 7
 : Commit your changes with a descriptive commit message:
 
-- Provide a summary on the first line, typically 50 characters or less, followed by a blank line.
-- Optionally, provide a detailed description where each line is 80 characters or less, followed by a blank line.
-- Add one or more "Fixes" or "Closes" keywords, each on its own line, referencing the [issues] addressed by this change.
+  - Provide a summary on the first line, typically 50 characters or less, followed by a blank line.
+    - Begin the summary with one of content, theme, config, all, or misc, followed by a colon, a space, and a brief description of the change beginning with a capital letter
+    - Use imperative present tense
+    - See the [commit message guidelines] for requirements
+  - Optionally, provide a detailed description where each line is 72 characters or less, followed by a blank line.
+  - Add one or more "Fixes" or "Closes" keywords, each on its own line, referencing the [issues] addressed by this change.
 
-[issues]: https://github.com/gohugoio/hugo/issues
+  For example:
 
-For example:
+  ```sh
+  git commit -m "tpl/strings: Create wrap function
 
-```sh
-git commit -m "tpl/strings: Create wrap function
+  The strings.Wrap function wraps a string into one or more lines,
+  splitting the string after the given number of characters, but not
+  splitting in the middle of a word.
 
-The strings.Wrap function wraps a string into one or more lines,
-splitting the string after the given number of characters, but not
-splitting in the middle of a word.
-
-Fixes #99998
-Closes #99999"
-```
-
-See the [commit message guidelines] for details.
-
-[commit message guidelines]: https://github.com/gohugoio/hugo/blob/master/CONTRIBUTING.md#git-commit-message-guidelines
+  Fixes #99998
+  Closes #99999"
+  ```
 
 Step 8
 : Push the new branch to your fork of the documentation repository.
@@ -172,7 +143,7 @@ CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@latest
 To build and install a specific release:
 
 ```sh
-CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@v0.141.0
+CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@v0.148.0
 ```
 
 To build and install at the latest commit on the master branch:
@@ -184,5 +155,22 @@ CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@master
 To build and install at a specific commit:
 
 ```sh
-CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@0851c17
+CGO_ENABLED=1 go install -tags extended github.com/gohugoio/hugo@c0d9beb
 ```
+
+[bugs]: https://github.com/gohugoio/hugo/issues?q=is%3Aopen+is%3Aissue+label%3ABug
+[Clang]: https://clang.llvm.org/
+[commit message guidelines]: https://github.com/gohugoio/hugo/blob/master/CONTRIBUTING.md#git-commit-message-guidelines
+[Contribution Guide]: https://github.com/gohugoio/hugo/blob/master/CONTRIBUTING.md
+[create a proposal]: https://github.com/gohugoio/hugo/issues/new?labels=Proposal%2C+NeedsTriage&template=feature_request.md
+[documentation]: /documentation
+[documentation repository]: https://github.com/gohugoio/hugoDocs
+[forum]: https://discourse.gohugo.io
+[GCC]: https://gcc.gnu.org/
+[Git]: https://git-scm.com/book/en/v2/Getting-Started-Installing-Git
+[Go]: https://go.dev/doc/install
+[Go documentation]: https://go.dev/doc/code#Command
+[issue queue]: https://github.com/gohugoio/hugo/issues
+[issues]: https://github.com/gohugoio/hugo/issues
+[project repository]: https://github.com/gohugoio/hugo/
+[themes]: https://themes.gohugo.io/

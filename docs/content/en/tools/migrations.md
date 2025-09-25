@@ -2,14 +2,9 @@
 title: Migrate to Hugo
 linkTitle: Migrations
 description: A list of community-developed tools for migrating from your existing static site generator or content management system to Hugo.
-categories: [developer tools]
-keywords: [migrations,jekyll,wordpress,drupal,ghost,contentful]
-menu:
-  docs:
-    parent: developer-tools
-    weight: 50
-weight: 50
-toc: true
+categories: []
+keywords: []
+weight: 40
 aliases: [/developer-tools/migrations/, /developer-tools/migrated/]
 ---
 
@@ -49,7 +44,7 @@ Alternatively, you can use the [Jekyll import command](/commands/hugo_import_jek
 : A small utility written in Java that exports the entire WordPress site from the database and resource (e.g., images) files stored locally or remotely. Therefore, migration from the backup files is possible. Supports merging multiple WordPress sites into a single Hugo site.
 
 [wp2hugo](https://github.com/ashishb/wp2hugo)
-: A Go-based CLI tool to migrate WordPress website to Hugo while preserving original URLs, GUIDs (for feeds), image URLs, code highlights, table of contents, YouTube embeds, Google Maps embeds, and original WordPress navigation categories. 
+: A Go-based CLI tool to migrate WordPress websites to Hugo. It preserves original URLs, GUIDs, image URLs, code highlights, tables of contents, and WordPress navigation categories. It migrates WordPress custom post types, custom taxonomies, custom fields, and page hierarchy. It supports translated WordPress blogs via Polylang or WPML. It imports a WordPress media library database with original titles and dates. The tool can download all media or only media inserted into pages from the original server. It converts WordPress shortcodes and Gutenberg blocks to Hugo shortcodes including galleries, images, audio, YouTube embeds, Gists, and Google Maps.
 
 ## Medium
 
@@ -68,7 +63,7 @@ Alternatively, you can use the [Jekyll import command](/commands/hugo_import_jek
 : Export all your Tumblr content to Hugo Markdown files with preserved original formatting.
 
 [Tumblr to Hugo](https://github.com/jipiboily/tumblr-to-hugo)
-: A migration tool that converts each of your Tumblr posts to a content file with a proper title and path. It also generates a  CSV file to help you set up URL redirects.
+: A migration tool that converts each of your Tumblr posts to a content file with a proper title and path. It also generates a CSV file to help you set up URL redirects.
 
 ## Drupal
 

@@ -65,9 +65,11 @@ See the [features] section of the documentation for a comprehensive summary of H
 
 <p>&nbsp;</p>
 <p float="left">
-  <a href="https://www.linode.com/?utm_campaign=hugosponsor&utm_medium=banner&utm_source=hugogithub" target="_blank"><img src="https://raw.githubusercontent.com/gohugoio/gohugoioTheme/master/assets/images/sponsors/linode-logo_standard_light_medium.png" width="200" alt="Linode"></a>
+  <a href="https://www.linode.com/?utm_campaign=hugosponsor&utm_medium=banner&utm_source=hugogithub" target="_blank"><img src="https://raw.githubusercontent.com/gohugoio/hugoDocs/master/assets/images/sponsors/linode-logo_standard_light_medium.png" width="200" alt="Linode"></a>
 &nbsp;&nbsp;&nbsp;
-  <a href="https://www.jetbrains.com/go/?utm_source=OSS&utm_medium=referral&utm_campaign=hugo" target="_blank"><img src="https://raw.githubusercontent.com/gohugoio/gohugoioTheme/master/assets/images/sponsors/goland.svg" width="200" alt="The complete IDE crafted for professional Go developers."></a>
+  <a href="https://www.jetbrains.com/go/?utm_source=OSS&utm_medium=referral&utm_campaign=hugo" target="_blank"><img src="https://raw.githubusercontent.com/gohugoio/hugoDocs/master/assets/images/sponsors/goland.svg" width="200" alt="The complete IDE crafted for professional Go developers."></a>
+  &nbsp;&nbsp;&nbsp;
+    <a href="https://cloudcannon.com/hugo-cms/?utm_campaign=HugoSponsorship&utm_source=sponsor&utm_content=gohugo" target="_blank"><img src="https://raw.githubusercontent.com/gohugoio/hugoDocs/master/assets/images/sponsors/cloudcannon-cms-logo.svg" width="200" alt="CloudCannon"></a>
 </p>
 
 ## Editions
@@ -100,9 +102,9 @@ Install Hugo from a [prebuilt binary], package manager, or package repository. P
 
 Prerequisites to build Hugo from source:
 
-- Standard edition: Go 1.23.0 or later
-- Extended edition: Go 1.23.0 or later, and GCC
-- Extended/deploy edition: Go 1.23.0 or later, and GCC
+- Standard edition: Go 1.24.0 or later
+- Extended edition: Go 1.24.0 or later, and GCC
+- Extended/deploy edition: Go 1.24.0 or later, and GCC
 
 Build the standard edition:
 
@@ -189,7 +191,6 @@ github.com/bep/simplecobra="v0.5.0"
 github.com/bep/tmc="v0.5.1"
 github.com/cespare/xxhash/v2="v2.3.0"
 github.com/clbanning/mxj/v2="v2.7.0"
-github.com/cli/safeexec="v1.0.1"
 github.com/cpuguy83/go-md2man/v2="v2.0.4"
 github.com/disintegration/gift="v1.2.1"
 github.com/dlclark/regexp2="v1.11.5"

@@ -21,7 +21,6 @@ import (
 	"github.com/gohugoio/hugo/lazy"
 	"github.com/gohugoio/hugo/markup/converter"
 	"github.com/gohugoio/hugo/navigation"
-	"github.com/gohugoio/hugo/output/layouts"
 	"github.com/gohugoio/hugo/resources/page"
 	"github.com/gohugoio/hugo/resources/resource"
 	"github.com/gohugoio/hugo/source"
@@ -86,11 +85,8 @@ type pageCommon struct {
 	// should look like.
 	targetPathDescriptor page.TargetPathDescriptor
 
-	layoutDescriptor     layouts.LayoutDescriptor
-	layoutDescriptorInit sync.Once
-
 	// Set if feature enabled and this is in a Git repo.
-	gitInfo    source.GitInfo
+	gitInfo    *source.GitInfo
 	codeowners []string
 
 	// Positional navigation
@@ -101,7 +97,7 @@ type pageCommon struct {
 	pageMenus *pageMenus
 
 	// Internal use
-	page.InternalDependencies
+	page.RelatedDocsHandlerProvider
 
 	contentConverterInit sync.Once
 	contentConverter     converter.Converter

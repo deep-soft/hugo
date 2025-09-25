@@ -98,7 +98,8 @@ ADD_MORE_PLACEHOLDER
 
 func TestPagesFromGoTmplMisc(t *testing.T) {
 	t.Parallel()
-	b := hugolib.Test(t, filesPagesFromDataTempleBasic)
+	b := hugolib.Test(t, filesPagesFromDataTempleBasic, hugolib.TestOptWarn())
+	b.AssertLogContains("! WARN")
 	b.AssertPublishDir(`
 docs/p1/mytext.txt
 docs/p1/sub/mytex2.tx
@@ -194,14 +195,7 @@ baseURL = "https://example.com"
 		b, err := hugolib.TestE(t, files)
 		b.Assert(err, qt.IsNotNil)
 		b.Assert(err.Error(), qt.Contains, "_content.gotmpl:1:4")
-		b.Assert(err.Error(), qt.Contains, "error calling AddPage: path not set")
-	})
-
-	t.Run("AddPage, path starting with slash", func(t *testing.T) {
-		files := strings.ReplaceAll(filesTemplate, "DICT", `(dict "kind" "page" "title" "p1" "path" "/foo")`)
-		b, err := hugolib.TestE(t, files)
-		b.Assert(err, qt.IsNotNil)
-		b.Assert(err.Error(), qt.Contains, `path "/foo" must not start with a /`)
+		b.Assert(err.Error(), qt.Contains, "error calling AddPage: empty path is reserved for the home page")
 	})
 
 	t.Run("AddPage, lang set", func(t *testing.T) {
@@ -229,23 +223,6 @@ baseURL = "https://example.com"
 				b.Assert(err.Error(), qt.Contains, fmt.Sprintf("error calling %s: this method cannot be called before the site is fully initialized", method))
 			})
 		}
-	})
-}
-
-func TestPagesFromGoTmplAddResourceErrors(t *testing.T) {
-	filesTemplate := `
--- hugo.toml --
-disableKinds = ["taxonomy", "term", "rss", "sitemap"]
-baseURL = "https://example.com"
--- content/docs/_content.gotmpl --
-{{ $.AddResource  DICT }}
-`
-
-	t.Run("missing Path", func(t *testing.T) {
-		files := strings.ReplaceAll(filesTemplate, "DICT", `(dict "name" "r1")`)
-		b, err := hugolib.TestE(t, files)
-		b.Assert(err, qt.IsNotNil)
-		b.Assert(err.Error(), qt.Contains, "error calling AddResource: path not set")
 	})
 }
 
@@ -329,6 +306,45 @@ func TestPagesFromGoTmplRemoveGoTmpl(t *testing.T) {
 		"Sections: Docs:/docs|",
 	)
 	b.AssertFileContent("public/docs/index.html", "RegularPagesRecursive: pfile:/docs/pfile|$")
+}
+
+func TestPagesFromGoTmplEditOverlappingContentFile(t *testing.T) {
+	t.Parallel()
+	files := `
+-- hugo.toml --
+disableLiveReload = true
+disableKinds = ["taxonomy", "term", "rss", "sitemap"]
+-- layouts/all.html --
+All: {{ .Content }}|{{ .Title }}|
+-- layouts/section.html --
+Title: {{ .Title}}|
+RegularPages: {{ range .RegularPages }}{{ .Title }}:{{ .Path }}|{{ end }}|
+-- content/mysection/_index.md --
+---
+title: "My Section"
+---
+-- content/mysection/p1.md --
+---
+title: "p1 content file"
+---
+Content of p1
+-- content/_content.gotmpl --
+{{ $.AddPage (dict "kind" "page" "path" "mysection/p2" "title" "p2 content adapter") }}
+`
+	b := hugolib.TestRunning(t, files)
+	b.AssertFileContent("public/mysection/index.html", "Title: My Section|", "RegularPages: p1 content file:/mysection/p1|p2 content adapter:/mysection/p2|")
+
+	b.EditFileReplaceAll("content/mysection/p1.md", `"p1 content file"`, `"p1 content file edited"`).Build()
+	b.AssertFileContent("public/mysection/index.html", "RegularPages: p1 content file edited:/mysection/p1|p2 content adapter:/mysection/p2|")
+
+	b.EditFileReplaceAll("content/mysection/_index.md", "My Section", "My Section edited").Build()
+	b.AssertFileContent("public/mysection/index.html", "Title: My Section edited|", "RegularPages: p1 content file edited:/mysection/p1|p2 content adapter:/mysection/p2|")
+
+	b.RemoveFiles("content/mysection/p1.md").Build()
+	b.AssertFileContent("public/mysection/index.html", "Title: My Section edited|\nRegularPages: p2 content adapter:/mysection/p2|")
+
+	b.RemoveFiles("content/_content.gotmpl", "public/mysection/index.html").Build()
+	b.AssertFileContent("public/mysection/index.html", "Title: My Section edited|\nRegularPages: |")
 }
 
 // Issue #13443.
@@ -777,4 +793,158 @@ Single.
 	b := hugolib.Test(t, files, hugolib.TestOptWarn())
 
 	b.AssertFileContent("public/tags/index.html", "Terms: mytag: 1|§s")
+}
+
+func TestContentAdapterOutputsIssue13689(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['home','rss','section','sitemap','taxonomy','term']
+[outputs]
+page = ['html','json']
+-- layouts/page.html --
+html: {{ .Title }}
+-- layouts/page.json --
+json: {{ .Title }}
+-- content/p1.md --
+---
+title: p1
+---
+-- content/p2.md --
+---
+title: p2
+outputs:
+  - html
+---
+-- content/_content.gotmpl --
+{{ $page := dict "path" "p3" "title" "p3" }}
+{{ $.AddPage $page }}
+
+{{ $page := dict "path" "p4" "title" "p4" "outputs" (slice "html") }}
+{{ $.AddPage $page }}
+`
+
+	b := hugolib.Test(t, files)
+
+	b.AssertFileExists("public/p1/index.html", true)
+	b.AssertFileExists("public/p1/index.json", true)
+	b.AssertFileExists("public/p2/index.html", true)
+	b.AssertFileExists("public/p2/index.json", false)
+	b.AssertFileExists("public/p3/index.html", true)
+	b.AssertFileExists("public/p3/index.json", true)
+	b.AssertFileExists("public/p4/index.html", true)
+	b.AssertFileExists("public/p4/index.json", false) // currently returns true
+}
+
+func TestContentAdapterOutputsIssue13692(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableKinds = ['page','home','sitemap','taxonomy','term']
+[[cascade]]
+outputs = ['html','json']
+[cascade.target]
+path = '{/s2,/s4}'
+-- layouts/section.html --
+html: {{ .Title }}
+-- layouts/section.json --
+json: {{ .Title }}
+-- content/s1/_index.md --
+---
+title: s1
+---
+-- content/s2/_index.md --
+---
+title: s2
+---
+-- content/_content.gotmpl --
+{{ $page := dict "path" "s3" "title" "s3" "kind" "section" }}
+{{ $.AddPage $page }}
+
+{{ $page := dict "path" "s4" "title" "s4" "kind" "section" }}
+{{ $.AddPage $page }}
+
+{{ $page := dict "path" "s5" "title" "s5" "kind" "section" "outputs" (slice "html") }}
+ {{ $.AddPage $page }}
+`
+
+	b := hugolib.Test(t, files)
+
+	b.AssertFileExists("public/s1/index.html", true)
+	b.AssertFileExists("public/s1/index.json", false)
+	b.AssertFileExists("public/s1/index.xml", true)
+
+	b.AssertFileExists("public/s2/index.html", true)
+	b.AssertFileExists("public/s2/index.json", true)
+	b.AssertFileExists("public/s2/index.xml", false)
+
+	b.AssertFileExists("public/s3/index.html", true)
+	b.AssertFileExists("public/s3/index.json", false)
+	b.AssertFileExists("public/s3/index.xml", true)
+
+	b.AssertFileExists("public/s4/index.html", true)
+	b.AssertFileExists("public/s4/index.json", true)
+	b.AssertFileExists("public/s4/index.xml", false)
+
+	b.AssertFileExists("public/s5/index.html", true)
+	b.AssertFileExists("public/s5/index.json", false)
+	b.AssertFileExists("public/s5/index.xml", false)
+}
+
+func TestContentAdapterCascadeBasic(t *testing.T) {
+	t.Parallel()
+
+	files := `
+-- hugo.toml --
+disableLiveReload = true
+-- content/_index.md --
+---
+cascade:
+  - title: foo
+    target:
+      path: "**"
+---
+-- layouts/all.html --
+Title: {{ .Title }}|Content: {{ .Content }}|
+-- content/_content.gotmpl --
+{{ $content := dict
+  "mediaType" "text/markdown"
+  "value" "The _Hunchback of Notre Dame_ was written by Victor Hugo."
+}}
+
+{{ $page := dict "path" "s1"  "kind" "page" }}
+{{ $.AddPage $page }}
+ {{ $page := dict "path" "s2"  "kind" "page" "title" "bar" "content" $content }}
+{{ $.AddPage $page }}
+
+`
+
+	b := hugolib.TestRunning(t, files)
+
+	b.AssertFileContent("public/s1/index.html", "Title: foo|")
+	b.AssertFileContent("public/s2/index.html", "Title: bar|", "Content: <p>The <em>Hunchback of Notre Dame</em> was written by Victor Hugo.</p>")
+
+	b.EditFileReplaceAll("content/_index.md", "foo", "baz").Build()
+
+	b.AssertFileContent("public/s1/index.html", "Title: baz|")
+}
+
+func TestPagesFromGoTmplHome(t *testing.T) {
+	t.Parallel()
+
+	files := ` 
+-- hugo.toml --
+disableKinds = ["taxonomy", "term", "rss", "sitemap"]
+baseURL = "https://example.com"
+-- layouts/all.html --
+{{ .Kind }}: {{ .Title }}|
+-- content/_content.gotmpl --
+{{ $.AddPage (dict  "title" "My Home!" "kind" "home" ) }}
+
+`
+	b := hugolib.Test(t, files)
+
+	b.AssertFileContent("public/index.html", "home: My Home!|")
 }

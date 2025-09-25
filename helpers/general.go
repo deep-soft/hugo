@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -228,17 +229,7 @@ func compareStringSlices(a, b []string) bool {
 		return false
 	}
 
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-
-	return true
+	return slices.Equal(a, b)
 }
 
 // SliceToLower goes through the source slice and lowers all values.
@@ -253,6 +244,27 @@ func SliceToLower(s []string) []string {
 	}
 
 	return l
+}
+
+// StringSliceToList formats a string slice into a human-readable list.
+// It joins the elements of the slice s with commas, using an Oxford comma,
+// and precedes the final element with the conjunction c.
+func StringSliceToList(s []string, c string) string {
+	const defaultConjunction = "and"
+
+	if c == "" {
+		c = defaultConjunction
+	}
+	if len(s) == 0 {
+		return ""
+	}
+	if len(s) == 1 {
+		return s[0]
+	}
+	if len(s) == 2 {
+		return fmt.Sprintf("%s %s %s", s[0], c, s[1])
+	}
+	return fmt.Sprintf("%s, %s %s", strings.Join(s[:len(s)-1], ", "), c, s[len(s)-1])
 }
 
 // IsWhitespace determines if the given rune is whitespace.

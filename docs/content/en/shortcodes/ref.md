@@ -1,48 +1,65 @@
 ---
-title: Ref
+title: Ref shortcode
+linkTitle: Ref
 description: Insert a permalink to the given page reference using the ref shortcode.
-categories: [shortcodes]
+categories: []
 keywords: []
-menu:
-  docs:
-    parent: shortcodes
-    weight:
-weight:
 ---
 
-{{% note %}}
-To override Hugo's embedded `ref` shortcode, copy the [source code] to a file with the same name in the `layouts/shortcodes` directory.
+> [!note]
+> To override Hugo's embedded `ref` shortcode, copy the [source code] to a file with the same name in the `layouts/_shortcodes` directory.
 
-[source code]: {{% eturl ref %}}
-{{% /note %}}
+> [!note]
+> When working with Markdown this shortcode is obsolete. Instead, to properly resolve Markdown link destinations, use the [embedded link render hook] or create your own.
+>
+> In its default configuration, Hugo automatically uses the embedded link render hook for multilingual single-host sites, specifically when the [duplication of shared page resources] feature is disabled. This is the default behavior for such sites. If custom link render hooks are defined by your project, modules, or themes, these will be used instead.
+>
+> You can also configure Hugo to `always` use the embedded link render hook, use it only as a `fallback`, or `never` use it. See&nbsp;[details](/configuration/markup/#renderhookslinkuseembedded).
 
-{{% note %}}
-When working with the Markdown [content format], this shortcode has become largely redundant. Its functionality is now primarily handled by [link render hooks], specifically the embedded one provided by Hugo. This hook effectively addresses all the use cases previously covered by this shortcode.
+## Usage
 
-[content format]: /content-management/formats/
-[link render hooks]: /render-hooks/images/#default
-{{% /note %}}
+The `ref` shortcode accepts either a single positional argument (the path) or one or more named arguments, as listed below.
 
-The `ref` shortcode returns the permalink of the given page reference.
+## Arguments
 
-Example usage:
+{{% include "_common/ref-and-relref-options.md" %}}
 
-```text
-[Post 1]({{%/* ref "/posts/post-1" */%}})
-[Post 1]({{%/* ref "/posts/post-1.md" */%}})
-[Post 1]({{%/* ref "/posts/post-1#foo" */%}})
-[Post 1]({{%/* ref "/posts/post-1.md#foo" */%}})
+## Examples
+
+The `ref` shortcode typically provides the destination for a Markdown link.
+
+> [!note]
+> Always use [Markdown notation] notation when calling this shortcode.
+
+The following examples show the rendered output for a page on the English version of the site:
+
+```md
+[Link A]({{%/* ref "/books/book-1" */%}})
+
+[Link B]({{%/* ref path="/books/book-1" */%}})
+
+[Link C]({{%/* ref path="/books/book-1" lang="de" */%}})
+
+[Link D]({{%/* ref path="/books/book-1" lang="de" outputFormat="json" */%}})
 ```
 
 Rendered:
 
 ```html
-<a href="https://example.org/posts/post-1/">Post 1</a>
-<a href="https://example.org/posts/post-1/">Post 1</a>
-<a href="https://example.org/posts/post-1/#foo">Post 1</a>
-<a href="https://example.org/posts/post-1/#foo">Post 1</a>
+<a href="https://example.org/en/books/book-1/">Link A</a>
+
+<a href="https://example.org/en/books/book-1/">Link B</a>
+
+<a href="https://example.org/de/books/book-1/">Link C</a>
+
+<a href="https://example.org/de/books/book-1/index.json">Link D</a>
 ```
 
-{{% note %}}
-Always use the `{{%/* */%}}` notation when calling this shortcode.
-{{% /note %}}
+## Error handling
+
+{{% include "_common/ref-and-relref-error-handling.md" %}}
+
+[duplication of shared page resources]: /configuration/markup/#duplicateresourcefiles
+[embedded link render hook]: /render-hooks/links/#embedded
+[Markdown notation]: /content-management/shortcodes/#notation
+[source code]: {{% eturl relref %}}

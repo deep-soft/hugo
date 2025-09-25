@@ -134,7 +134,6 @@ func (h *HugoSites) resolveSite(lang string) *Site {
 	return nil
 }
 
-// Only used in tests.
 type buildCounters struct {
 	contentRenderCounter atomic.Uint64
 	pageRenderCounter    atomic.Uint64
@@ -231,13 +230,13 @@ func (h *HugoSites) RegularPages() page.Pages {
 	return v
 }
 
-func (h *HugoSites) gitInfoForPage(p page.Page) (source.GitInfo, error) {
+func (h *HugoSites) gitInfoForPage(p page.Page) (*source.GitInfo, error) {
 	if _, err := h.init.gitInfo.Do(context.Background()); err != nil {
-		return source.GitInfo{}, err
+		return nil, err
 	}
 
 	if h.gitInfo == nil {
-		return source.GitInfo{}, nil
+		return nil, nil
 	}
 
 	return h.gitInfo.forPage(p), nil
@@ -557,7 +556,6 @@ func (h *HugoSites) handleDataFile(r *source.File) error {
 	higherPrecedentData := current[r.BaseFileName()]
 
 	switch data.(type) {
-	case nil:
 	case map[string]any:
 
 		switch higherPrecedentData.(type) {

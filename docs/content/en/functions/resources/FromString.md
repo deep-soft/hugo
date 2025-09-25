@@ -3,12 +3,11 @@ title: resources.FromString
 description: Returns a resource created from a string.
 categories: []
 keywords: []
-action:
-  aliases: []
-  related:
-    - functions/resources/ExecuteAsTemplate
-  returnType: resource.Resource
-  signatures: [resources.FromString TARGETPATH STRING]
+params:
+  functions_and_methods:
+    aliases: []
+    returnType: resource.Resource
+    signatures: [resources.FromString TARGETPATH STRING]
 ---
 
 The `resources.FromString` function returns a resource created from a string, caching the result using the target path as its cache key.
@@ -23,9 +22,9 @@ Let's say you need to publish a file named "site.json" in the root of your `publ
 
 ```json
 {
-  "build_date": "2025-01-16T19:14:41-08:00",
-  "hugo_version": "0.141.0",
-  "last_modified": "2025-01-16T19:14:46-08:00"
+  "build_date": "2025-07-08T13:12:19-07:00",
+  "hugo_version": "0.148.0",
+  "last_modified": "2025-07-07T22:09:13-07:00"
 }
 ```
 

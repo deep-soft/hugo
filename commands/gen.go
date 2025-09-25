@@ -50,6 +50,8 @@ func newGenCommand() *genCommand {
 		highlightStyle         string
 		lineNumbersInlineStyle string
 		lineNumbersTableStyle  string
+		omitEmpty              bool
+		omitClassComments      bool
 	)
 
 	newChromaStyles := func() simplecobra.Commander {
@@ -79,7 +81,16 @@ See https://xyproto.github.io/splash/docs/all.html for a preview of the availabl
 				if err != nil {
 					return err
 				}
-				formatter := html.New(html.WithAllClasses(true))
+
+				if omitEmpty {
+					// See https://github.com/alecthomas/chroma/commit/5b2a4c5a26c503c79bc86ba3c4ae5b330028bd3d
+					hugo.Deprecate("--omitEmpty", "Flag is no longer needed, empty classes are now always omitted.", "v0.149.0")
+				}
+				options := []html.Option{
+					html.WithCSSComments(!omitClassComments),
+				}
+				formatter := html.New(options...)
+
 				w := os.Stdout
 				fmt.Fprintf(w, "/* Generated using: hugo %s */\n\n", strings.Join(os.Args[1:], " "))
 				formatter.WriteCSS(w, style)
@@ -95,6 +106,10 @@ See https://xyproto.github.io/splash/docs/all.html for a preview of the availabl
 				_ = cmd.RegisterFlagCompletionFunc("lineNumbersInlineStyle", cobra.NoFileCompletions)
 				cmd.PersistentFlags().StringVar(&lineNumbersTableStyle, "lineNumbersTableStyle", "", `foreground and background colors for table line numbers, e.g. --lineNumbersTableStyle "#fff000 bg:#000fff"`)
 				_ = cmd.RegisterFlagCompletionFunc("lineNumbersTableStyle", cobra.NoFileCompletions)
+				cmd.PersistentFlags().BoolVar(&omitEmpty, "omitEmpty", false, `omit empty CSS rules (deprecated, no longer needed)`)
+				_ = cmd.RegisterFlagCompletionFunc("omitEmpty", cobra.NoFileCompletions)
+				cmd.PersistentFlags().BoolVar(&omitClassComments, "omitClassComments", false, `omit CSS class comment prefixes in the generated CSS`)
+				_ = cmd.RegisterFlagCompletionFunc("omitClassComments", cobra.NoFileCompletions)
 			},
 		}
 	}
@@ -174,13 +189,13 @@ url: %s
 				prepender := func(filename string) string {
 					name := filepath.Base(filename)
 					base := strings.TrimSuffix(name, path.Ext(name))
-					url := "/commands/" + strings.ToLower(base) + "/"
+					url := "/docs/reference/commands/" + strings.ToLower(base) + "/"
 					return fmt.Sprintf(gendocFrontmatterTemplate, strings.Replace(base, "_", " ", -1), base, url)
 				}
 
 				linkHandler := func(name string) string {
 					base := strings.TrimSuffix(name, path.Ext(name))
-					return "/commands/" + strings.ToLower(base) + "/"
+					return "/docs/reference/commands/" + strings.ToLower(base) + "/"
 				}
 				r.Println("Generating Hugo command-line documentation in", gendocdir, "...")
 				doc.GenMarkdownTreeCustom(cd.CobraCommand.Root(), gendocdir, prepender, linkHandler)

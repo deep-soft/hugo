@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,7 +33,6 @@ import (
 	"github.com/gohugoio/hugo/common/loggers"
 	"github.com/gohugoio/hugo/common/maps"
 	"github.com/gohugoio/hugo/common/paths"
-	"github.com/gohugoio/hugo/common/types"
 	"github.com/gohugoio/hugo/common/urls"
 	"github.com/gohugoio/hugo/config"
 	"github.com/gohugoio/hugo/config/privacy"
@@ -42,6 +42,7 @@ import (
 	"github.com/gohugoio/hugo/helpers"
 	"github.com/gohugoio/hugo/hugolib/segments"
 	"github.com/gohugoio/hugo/langs"
+	gc "github.com/gohugoio/hugo/markup/goldmark/goldmark_config"
 	"github.com/gohugoio/hugo/markup/markup_config"
 	"github.com/gohugoio/hugo/media"
 	"github.com/gohugoio/hugo/minifiers"
@@ -146,7 +147,7 @@ type Config struct {
 
 	// The cascade configuration section contains the top level front matter cascade configuration options,
 	// a slice of page matcher and params to apply to those pages.
-	Cascade *config.ConfigNamespace[[]page.PageMatcherParamsConfig, *maps.Ordered[page.PageMatcher, maps.Params]] `mapstructure:"-"`
+	Cascade *config.ConfigNamespace[[]page.PageMatcherParamsConfig, *maps.Ordered[page.PageMatcher, page.PageMatcherParamsConfig]] `mapstructure:"-"`
 
 	// The segments defines segments for the site. Used for partial/segmented builds.
 	Segments *config.ConfigNamespace[map[string]segments.SegmentConfig, segments.Segments] `mapstructure:"-"`
@@ -396,44 +397,80 @@ func (c *Config) CompileConfig(logger loggers.Logger) error {
 
 	// Legacy paginate values.
 	if c.Paginate != 0 {
-		hugo.Deprecate("site config key paginate", "Use pagination.pagerSize instead.", "v0.128.0")
+		hugo.DeprecateWithLogger("site config key paginate", "Use pagination.pagerSize instead.", "v0.128.0", logger.Logger())
 		c.Pagination.PagerSize = c.Paginate
 	}
-
 	if c.PaginatePath != "" {
-		hugo.Deprecate("site config key paginatePath", "Use pagination.path instead.", "v0.128.0")
+		hugo.DeprecateWithLogger("site config key paginatePath", "Use pagination.path instead.", "v0.128.0", logger.Logger())
 		c.Pagination.Path = c.PaginatePath
 	}
 
 	// Legacy privacy values.
 	if c.Privacy.Twitter.Disable {
-		hugo.Deprecate("site config key privacy.twitter.disable", "Use privacy.x.disable instead.", "v0.141.0")
+		hugo.DeprecateWithLogger("site config key privacy.twitter.disable", "Use privacy.x.disable instead.", "v0.141.0", logger.Logger())
 		c.Privacy.X.Disable = c.Privacy.Twitter.Disable
 	}
-
 	if c.Privacy.Twitter.EnableDNT {
-		hugo.Deprecate("site config key privacy.twitter.enableDNT", "Use privacy.x.enableDNT instead.", "v0.141.0")
+		hugo.DeprecateWithLogger("site config key privacy.twitter.enableDNT", "Use privacy.x.enableDNT instead.", "v0.141.0", logger.Logger())
 		c.Privacy.X.EnableDNT = c.Privacy.Twitter.EnableDNT
 	}
-
 	if c.Privacy.Twitter.Simple {
-		hugo.Deprecate("site config key privacy.twitter.simple", "Use privacy.x.simple instead.", "v0.141.0")
+		hugo.DeprecateWithLogger("site config key privacy.twitter.simple", "Use privacy.x.simple instead.", "v0.141.0", logger.Logger())
 		c.Privacy.X.Simple = c.Privacy.Twitter.Simple
 	}
 
 	// Legacy services values.
 	if c.Services.Twitter.DisableInlineCSS {
-		hugo.Deprecate("site config key services.twitter.disableInlineCSS", "Use services.x.disableInlineCSS instead.", "v0.141.0")
+		hugo.DeprecateWithLogger("site config key services.twitter.disableInlineCSS", "Use services.x.disableInlineCSS instead.", "v0.141.0", logger.Logger())
 		c.Services.X.DisableInlineCSS = c.Services.Twitter.DisableInlineCSS
 	}
 
 	// Legacy permalink tokens
 	vs := fmt.Sprintf("%v", c.Permalinks)
 	if strings.Contains(vs, ":filename") {
-		hugo.Deprecate("the \":filename\" permalink token", "Use \":contentbasename\" instead.", "0.144.0")
+		hugo.DeprecateWithLogger("the \":filename\" permalink token", "Use \":contentbasename\" instead.", "0.144.0", logger.Logger())
 	}
 	if strings.Contains(vs, ":slugorfilename") {
-		hugo.Deprecate("the \":slugorfilename\" permalink token", "Use \":slugorcontentbasename\" instead.", "0.144.0")
+		hugo.DeprecateWithLogger("the \":slugorfilename\" permalink token", "Use \":slugorcontentbasename\" instead.", "0.144.0", logger.Logger())
+	}
+
+	// Legacy render hook values.
+	alternativeDetails := fmt.Sprintf(
+		"Set to %q if previous value was false, or set to %q if previous value was true.",
+		gc.RenderHookUseEmbeddedNever,
+		gc.RenderHookUseEmbeddedFallback,
+	)
+	if c.Markup.Goldmark.RenderHooks.Image.EnableDefault != nil {
+		alternative := "Use markup.goldmark.renderHooks.image.useEmbedded instead." + " " + alternativeDetails
+		hugo.DeprecateWithLogger("site config key markup.goldmark.renderHooks.image.enableDefault", alternative, "0.148.0", logger.Logger())
+		if *c.Markup.Goldmark.RenderHooks.Image.EnableDefault {
+			c.Markup.Goldmark.RenderHooks.Image.UseEmbedded = gc.RenderHookUseEmbeddedFallback
+		} else {
+			c.Markup.Goldmark.RenderHooks.Image.UseEmbedded = gc.RenderHookUseEmbeddedNever
+		}
+	}
+	if c.Markup.Goldmark.RenderHooks.Link.EnableDefault != nil {
+		alternative := "Use markup.goldmark.renderHooks.link.useEmbedded instead." + " " + alternativeDetails
+		hugo.DeprecateWithLogger("site config key markup.goldmark.renderHooks.link.enableDefault", alternative, "0.148.0", logger.Logger())
+		if *c.Markup.Goldmark.RenderHooks.Link.EnableDefault {
+			c.Markup.Goldmark.RenderHooks.Link.UseEmbedded = gc.RenderHookUseEmbeddedFallback
+		} else {
+			c.Markup.Goldmark.RenderHooks.Link.UseEmbedded = gc.RenderHookUseEmbeddedNever
+		}
+	}
+
+	// Validate render hook configuration.
+	renderHookUseEmbeddedModes := []string{
+		gc.RenderHookUseEmbeddedAlways,
+		gc.RenderHookUseEmbeddedAuto,
+		gc.RenderHookUseEmbeddedFallback,
+		gc.RenderHookUseEmbeddedNever,
+	}
+	if !slices.Contains(renderHookUseEmbeddedModes, c.Markup.Goldmark.RenderHooks.Image.UseEmbedded) {
+		return fmt.Errorf("site config markup.goldmark.renderHooks.image must be one of %s", helpers.StringSliceToList(renderHookUseEmbeddedModes, "or"))
+	}
+	if !slices.Contains(renderHookUseEmbeddedModes, c.Markup.Goldmark.RenderHooks.Link.UseEmbedded) {
+		return fmt.Errorf("site config markup.goldmark.renderHooks.link must be one of %s", helpers.StringSliceToList(renderHookUseEmbeddedModes, "or"))
 	}
 
 	c.C = &ConfigCompiled{
@@ -776,7 +813,7 @@ type Configs struct {
 }
 
 func (c *Configs) Validate(logger loggers.Logger) error {
-	c.Base.Cascade.Config.Range(func(p page.PageMatcher, params maps.Params) bool {
+	c.Base.Cascade.Config.Range(func(p page.PageMatcher, cfg page.PageMatcherParamsConfig) bool {
 		page.CheckCascadePattern(logger, p)
 		return true
 	})
@@ -800,28 +837,56 @@ func (c *Configs) IsZero() bool {
 
 func (c *Configs) Init() error {
 	var languages langs.Languages
-	defaultContentLanguage := c.Base.DefaultContentLanguage
-	for k, v := range c.LanguageConfigMap {
+
+	var langKeys []string
+	var hasEn bool
+
+	const en = "en"
+
+	for k := range c.LanguageConfigMap {
+		langKeys = append(langKeys, k)
+		if k == en {
+			hasEn = true
+		}
+	}
+
+	// Sort the LanguageConfigSlice by language weight (if set) or lang.
+	sort.Slice(langKeys, func(i, j int) bool {
+		ki := langKeys[i]
+		kj := langKeys[j]
+		lki := c.LanguageConfigMap[ki]
+		lkj := c.LanguageConfigMap[kj]
+		li := lki.Languages[ki]
+		lj := lkj.Languages[kj]
+		if li.Weight != lj.Weight {
+			return li.Weight < lj.Weight
+		}
+		return ki < kj
+	})
+
+	// See issue #13646.
+	defaultConfigLanguageFallback := en
+	if !hasEn {
+		// Pick the first one.
+		defaultConfigLanguageFallback = langKeys[0]
+	}
+
+	if c.Base.DefaultContentLanguage == "" {
+		c.Base.DefaultContentLanguage = defaultConfigLanguageFallback
+	}
+
+	for _, k := range langKeys {
+		v := c.LanguageConfigMap[k]
+		if v.DefaultContentLanguage == "" {
+			v.DefaultContentLanguage = defaultConfigLanguageFallback
+		}
+		c.LanguageConfigSlice = append(c.LanguageConfigSlice, v)
 		languageConf := v.Languages[k]
-		language, err := langs.NewLanguage(k, defaultContentLanguage, v.TimeZone, languageConf)
+		language, err := langs.NewLanguage(k, c.Base.DefaultContentLanguage, v.TimeZone, languageConf)
 		if err != nil {
 			return err
 		}
 		languages = append(languages, language)
-	}
-
-	// Sort the sites by language weight (if set) or lang.
-	sort.Slice(languages, func(i, j int) bool {
-		li := languages[i]
-		lj := languages[j]
-		if li.Weight != lj.Weight {
-			return li.Weight < lj.Weight
-		}
-		return li.Lang < lj.Lang
-	})
-
-	for _, l := range languages {
-		c.LanguageConfigSlice = append(c.LanguageConfigSlice, c.LanguageConfigMap[l.Lang])
 	}
 
 	// Filter out disabled languages.
@@ -836,12 +901,12 @@ func (c *Configs) Init() error {
 
 	var languagesDefaultFirst langs.Languages
 	for _, l := range languages {
-		if l.Lang == defaultContentLanguage {
+		if l.Lang == c.Base.DefaultContentLanguage {
 			languagesDefaultFirst = append(languagesDefaultFirst, l)
 		}
 	}
 	for _, l := range languages {
-		if l.Lang != defaultContentLanguage {
+		if l.Lang != c.Base.DefaultContentLanguage {
 			languagesDefaultFirst = append(languagesDefaultFirst, l)
 		}
 	}
@@ -849,7 +914,24 @@ func (c *Configs) Init() error {
 	c.Languages = languages
 	c.LanguagesDefaultFirst = languagesDefaultFirst
 
-	c.ContentPathParser = &paths.PathParser{LanguageIndex: languagesDefaultFirst.AsIndexSet(), IsLangDisabled: c.Base.IsLangDisabled, IsContentExt: c.Base.ContentTypes.Config.IsContentSuffix}
+	c.ContentPathParser = &paths.PathParser{
+		LanguageIndex:  languagesDefaultFirst.AsIndexSet(),
+		IsLangDisabled: c.Base.IsLangDisabled,
+		IsContentExt:   c.Base.ContentTypes.Config.IsContentSuffix,
+		IsOutputFormat: func(name, ext string) bool {
+			if name == "" {
+				return false
+			}
+
+			if of, ok := c.Base.OutputFormats.Config.GetByName(name); ok {
+				if ext != "" && !of.MediaType.HasSuffix(ext) {
+					return false
+				}
+				return true
+			}
+			return false
+		},
+	}
 
 	c.configLangs = make([]config.AllProvider, len(c.Languages))
 	for i, l := range c.LanguagesDefaultFirst {
@@ -910,17 +992,48 @@ func (c Configs) GetByLang(lang string) config.AllProvider {
 	return nil
 }
 
+func newDefaultConfig() *Config {
+	return &Config{
+		Taxonomies: map[string]string{"tag": "tags", "category": "categories"},
+		Sitemap:    config.SitemapConfig{Priority: -1, Filename: "sitemap.xml"},
+		RootConfig: RootConfig{
+			Environment:          hugo.EnvironmentProduction,
+			TitleCaseStyle:       "AP",
+			PluralizeListTitles:  true,
+			CapitalizeListTitles: true,
+			StaticDir:            []string{"static"},
+			SummaryLength:        70,
+			Timeout:              "60s",
+
+			CommonDirs: config.CommonDirs{
+				ArcheTypeDir: "archetypes",
+				ContentDir:   "content",
+				ResourceDir:  "resources",
+				PublishDir:   "public",
+				ThemesDir:    "themes",
+				AssetDir:     "assets",
+				LayoutDir:    "layouts",
+				I18nDir:      "i18n",
+				DataDir:      "data",
+			},
+		},
+	}
+}
+
 // fromLoadConfigResult creates a new Config from res.
 func fromLoadConfigResult(fs afero.Fs, logger loggers.Logger, res config.LoadConfigResult) (*Configs, error) {
 	if !res.Cfg.IsSet("languages") {
 		// We need at least one
 		lang := res.Cfg.GetString("defaultContentLanguage")
+		if lang == "" {
+			lang = "en"
+		}
 		res.Cfg.Set("languages", maps.Params{lang: maps.Params{}})
 	}
 	bcfg := res.BaseConfig
 	cfg := res.Cfg
 
-	all := &Config{}
+	all := newDefaultConfig()
 
 	err := decodeConfigFromParams(fs, logger, bcfg, cfg, all, nil)
 	if err != nil {
@@ -930,6 +1043,7 @@ func fromLoadConfigResult(fs afero.Fs, logger loggers.Logger, res config.LoadCon
 	langConfigMap := make(map[string]*Config)
 
 	languagesConfig := cfg.GetStringMap("languages")
+
 	var isMultihost bool
 
 	if err := all.CompileConfig(logger); err != nil {
@@ -1005,13 +1119,11 @@ func fromLoadConfigResult(fs afero.Fs, logger loggers.Logger, res config.LoadCon
 
 			// Adjust Goldmark config defaults for multilingual, single-host sites.
 			if len(languagesConfig) > 1 && !isMultihost && !clone.Markup.Goldmark.DuplicateResourceFiles {
-				if !clone.Markup.Goldmark.DuplicateResourceFiles {
-					if clone.Markup.Goldmark.RenderHooks.Link.EnableDefault == nil {
-						clone.Markup.Goldmark.RenderHooks.Link.EnableDefault = types.NewBool(true)
-					}
-					if clone.Markup.Goldmark.RenderHooks.Image.EnableDefault == nil {
-						clone.Markup.Goldmark.RenderHooks.Image.EnableDefault = types.NewBool(true)
-					}
+				if clone.Markup.Goldmark.RenderHooks.Image.UseEmbedded == gc.RenderHookUseEmbeddedAuto {
+					clone.Markup.Goldmark.RenderHooks.Image.UseEmbedded = gc.RenderHookUseEmbeddedFallback
+				}
+				if clone.Markup.Goldmark.RenderHooks.Link.UseEmbedded == gc.RenderHookUseEmbeddedAuto {
+					clone.Markup.Goldmark.RenderHooks.Link.UseEmbedded = gc.RenderHookUseEmbeddedFallback
 				}
 			}
 

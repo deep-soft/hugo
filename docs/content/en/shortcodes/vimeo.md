@@ -1,21 +1,13 @@
 ---
-title: Vimeo
+title: Vimeo shortcode
+linkTitle: Vimeo
 description: Embed a Vimeo video in your content using the vimeo shortcode.
-categories: [shortcodes]
+categories: []
 keywords: []
-menu:
-  docs:
-    parent: shortcodes
-    weight:
-weight:
-toc: true
 ---
 
-{{% note %}}
-To override Hugo's embedded `vimeo` shortcode, copy the [source code] to a file with the same name in the `layouts/shortcodes` directory.
-
-[source code]: {{% eturl vimeo %}}
-{{% /note %}}
+> [!note]
+> To override Hugo's embedded `vimeo` shortcode, copy the [source code] to a file with the same name in the `layouts/_shortcodes` directory.
 
 ## Example
 
@@ -35,21 +27,29 @@ Hugo renders this to:
 
 {{< vimeo 55073825 >}}
 
-## Parameters
+## Arguments
+
+id
+: (string) The video `id`. Optional if the `id` is the first and only positional argument.
+
+allowFullScreen
+: {{< new-in 0.146.0 />}}
+: (`bool`) Whether the `iframe` element can activate full screen mode. Default is `true`.
 
 class
 : (`string`) The `class` attribute of the wrapping `div` element. Adding one or more CSS classes disables inline styling.
 
-id
-: (`string`) The `id` of the Vimeo video
+loading
+: {{< new-in 0.146.0 />}}
+: (`string`) The loading attribute of the `iframe` element, either `eager` or `lazy`. Default is `eager`.
 
 title
 : (`string`) The `title` attribute of the `iframe` element.
 
-If you provide a `class` or `title` you must use a named parameter for the `id`.
+Here's an example using some of the available arguments:
 
 ```text
-{{</* vimeo id=55073825 class="foo bar" title="My Video" */>}}
+{{</* vimeo id=55073825 allowFullScreen=false loading=lazy */>}}
 ```
 
 ## Privacy
@@ -70,3 +70,4 @@ simple
 The source code for the simple version of the shortcode is available [here].
 
 [here]: {{% eturl vimeo_simple %}}
+[source code]: {{% eturl vimeo %}}

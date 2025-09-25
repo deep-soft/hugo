@@ -3,15 +3,16 @@ title: Taxonomies
 description: Returns a data structure containing the site's Taxonomy objects, the terms within each Taxonomy object, and the pages to which the terms are assigned.
 categories: []
 keywords: []
-action:
-  related: []
-  returnType: page.TaxonomyList
-  signatures: [SITE.Taxonomies]
+params:
+  functions_and_methods:
+    returnType: page.TaxonomyList
+    signatures: [SITE.Taxonomies]
 ---
 
 Conceptually, the `Taxonomies` method on a `Site` object returns a data structure such&nbsp;as:
 
-{{< code-toggle >}}
+<!-- markdownlint-disable MD007 MD032 -->
+{{< code-toggle file=hugo >}}
 taxonomy a:
   - term 1:
     - page 1
@@ -25,6 +26,7 @@ taxonomy b:
     - page 1
     - page 2
 {{< /code-toggle >}}
+<!-- markdownlint-enable MD007 MD032 -->
 
 For example, on a book review site you might create two taxonomies; one for genres and another for authors.
 
@@ -50,7 +52,8 @@ content/
 
 Conceptually, the taxonomies data structure looks like:
 
-{{< code-toggle >}}
+<!-- markdownlint-disable MD007 MD032 -->
+{{< code-toggle file=hugo >}}
 genres:
   - suspense:
     - And Then There Were None
@@ -68,6 +71,7 @@ authors:
   - jausten:
     - Pride and Prejudice
 {{< /code-toggle >}}
+<!-- markdownlint-enable MD007 MD032 -->
 
 To list the "suspense" books:
 
@@ -89,13 +93,10 @@ Hugo renders this to:
 </ul>
 ```
 
-{{% note %}}
-Hugo's taxonomy system is powerful, allowing you to classify content and create relationships between pages.
-
-Please see the [taxonomies] section for a complete explanation and examples.
-
-[taxonomies]: /content-management/taxonomies/
-{{% /note %}}
+> [!note]
+> Hugo's taxonomy system is powerful, allowing you to classify content and create relationships between pages.
+>
+> Please see the [taxonomies] section for a complete explanation and examples.
 
 ## Examples
 
@@ -141,9 +142,10 @@ The following example displays all terms in a site's tags taxonomy:
   {{ end }}
 </ul>
 ```
+
 This example will list all taxonomies and their terms, as well as all the content assigned to each of the terms.
 
-{{< code file=layouts/partials/all-taxonomies.html >}}
+```go-html-template {file="layouts/_partials/all-taxonomies.html"}
 {{ with .Site.Taxonomies }}
   {{ $numberOfTerms := 0 }}
   {{ range $taxonomy, $terms := . }}
@@ -174,4 +176,6 @@ This example will list all taxonomies and their terms, as well as all the conten
     </ul>
   {{ end }}
 {{ end }}
-{{< /code >}}
+```
+
+[taxonomies]: /content-management/taxonomies/

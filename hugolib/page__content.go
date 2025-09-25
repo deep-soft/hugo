@@ -24,15 +24,17 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	maps0 "maps"
+
+	"github.com/bep/helpers/contexthelpers"
 	"github.com/bep/logg"
-	"github.com/gohugoio/hugo/common/hcontext"
+
 	"github.com/gohugoio/hugo/common/herrors"
 	"github.com/gohugoio/hugo/common/hugio"
 	"github.com/gohugoio/hugo/common/hugo"
 	"github.com/gohugoio/hugo/common/maps"
 	"github.com/gohugoio/hugo/common/types/hstring"
 	"github.com/gohugoio/hugo/helpers"
-	"github.com/gohugoio/hugo/identity"
 	"github.com/gohugoio/hugo/markup"
 	"github.com/gohugoio/hugo/markup/converter"
 	"github.com/gohugoio/hugo/markup/goldmark/hugocontext"
@@ -45,7 +47,6 @@ import (
 	"github.com/gohugoio/hugo/tpl"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"
-	maps0 "maps"
 )
 
 const (
@@ -600,7 +601,7 @@ func (c *cachedContentScope) contentRendered(ctx context.Context) (contentSummar
 				return nil, err
 			}
 			if hasShortcodeVariants {
-				cp.po.p.pageOutputTemplateVariationsState.Add(1)
+				cp.po.p.incrPageOutputTemplateVariation()
 			}
 
 			var result contentSummary
@@ -644,8 +645,9 @@ func (c *cachedContentScope) contentRendered(ctx context.Context) (contentSummar
 			}
 			html := cp.po.p.s.ContentSpec.TrimShortHTML(b.Bytes(), cp.po.p.m.pageConfig.Content.Markup)
 			rs.Value.summary = page.Summary{
-				Text: helpers.BytesToHTML(html),
-				Type: page.SummaryTypeFrontMatter,
+				Text:      helpers.BytesToHTML(html),
+				Type:      page.SummaryTypeFrontMatter,
+				Truncated: rs.Value.summary.Truncated,
 			}
 			rs.Value.contentWithoutSummary = rs.Value.content
 		}
@@ -667,7 +669,13 @@ func (c *cachedContentScope) mustContentToC(ctx context.Context) contentTableOfC
 	return ct
 }
 
-var setGetContentCallbackInContext = hcontext.NewContextDispatcher[func(*pageContentOutput, contentTableOfContents)]("contentCallback")
+type contextKey uint8
+
+const (
+	contextKeyContentCallback contextKey = iota
+)
+
+var setGetContentCallbackInContext = contexthelpers.NewContextDispatcher[func(*pageContentOutput, contentTableOfContents)](contextKeyContentCallback)
 
 func (c *cachedContentScope) contentToC(ctx context.Context) (contentTableOfContents, error) {
 	cp := c.pco
@@ -684,10 +692,9 @@ func (c *cachedContentScope) contentToC(ctx context.Context) (contentTableOfCont
 		if err := cp.initRenderHooks(); err != nil {
 			return nil, err
 		}
-		f := cp.po.f
 		po := cp.po
 		p := po.p
-		ct.contentPlaceholders, err = c.shortcodeState.prepareShortcodesForPage(ctx, p, f, false)
+		ct.contentPlaceholders, err = c.shortcodeState.prepareShortcodesForPage(ctx, po, false)
 		if err != nil {
 			return nil, err
 		}
@@ -701,16 +708,14 @@ func (c *cachedContentScope) contentToC(ctx context.Context) (contentTableOfCont
 
 			if p.s.conf.Internal.Watch {
 				for _, s := range cp2.po.p.m.content.shortcodeState.shortcodes {
-					for _, templ := range s.templs {
-						cp.trackDependency(templ.(identity.IdentityProvider))
-					}
+					cp.trackDependency(s.templ)
 				}
 			}
 
 			// Transfer shortcode names so HasShortcode works for shortcodes from included pages.
 			cp.po.p.m.content.shortcodeState.transferNames(cp2.po.p.m.content.shortcodeState)
 			if cp2.po.p.pageOutputTemplateVariationsState.Load() > 0 {
-				cp.po.p.pageOutputTemplateVariationsState.Add(1)
+				cp.po.p.incrPageOutputTemplateVariation()
 			}
 		}
 
@@ -723,7 +728,7 @@ func (c *cachedContentScope) contentToC(ctx context.Context) (contentTableOfCont
 		}
 
 		if hasVariants {
-			p.pageOutputTemplateVariationsState.Add(1)
+			p.incrPageOutputTemplateVariation()
 		}
 
 		isHTML := cp.po.p.m.pageConfig.ContentMediaType.IsHTML()
@@ -847,7 +852,7 @@ func (c *cachedContentScope) contentPlain(ctx context.Context) (contentPlainPlai
 	})
 	if err != nil {
 		if herrors.IsTimeoutError(err) {
-			err = fmt.Errorf("timed out rendering the page content. You may have a circular loop in a shortcode, or your site may have resources that take longer to build than the `timeout` limit in your Hugo config file: %w", err)
+			err = fmt.Errorf("timed out rendering the page content. Extend the `timeout` limit in your Hugo config file: %w", err)
 		}
 		return contentPlainPlainWords{}, err
 	}
@@ -980,7 +985,7 @@ func (c *cachedContentScope) RenderString(ctx context.Context, args ...any) (tem
 			return "", err
 		}
 
-		placeholders, err := s.prepareShortcodesForPage(ctx, pco.po.p, pco.po.f, true)
+		placeholders, err := s.prepareShortcodesForPage(ctx, pco.po, true)
 		if err != nil {
 			return "", err
 		}
@@ -990,7 +995,7 @@ func (c *cachedContentScope) RenderString(ctx context.Context, args ...any) (tem
 			return "", err
 		}
 		if hasVariants {
-			pco.po.p.pageOutputTemplateVariationsState.Add(1)
+			pco.po.p.incrPageOutputTemplateVariation()
 		}
 		b, err := pco.renderContentWithConverter(ctx, conv, contentToRender, false)
 		if err != nil {
@@ -1028,7 +1033,7 @@ func (c *cachedContentScope) RenderString(ctx context.Context, args ...any) (tem
 				return "", err
 			}
 			if hasShortcodeVariants {
-				pco.po.p.pageOutputTemplateVariationsState.Add(1)
+				pco.po.p.incrPageOutputTemplateVariation()
 			}
 		}
 
@@ -1110,7 +1115,7 @@ func (c *cachedContentScope) RenderShortcodes(ctx context.Context) (template.HTM
 	}
 
 	if hasVariants {
-		pco.po.p.pageOutputTemplateVariationsState.Add(1)
+		pco.po.p.incrPageOutputTemplateVariation()
 	}
 
 	if cb != nil {

@@ -1,13 +1,12 @@
 ---
 title: GetPage
-description: Returns a Page object from the given path. 
+description: Returns a Page object from the given path.
 categories: []
 keywords: []
-action:
-  related:
-    - methods/site/GetPage
-  returnType: page.Page
-  signatures: [PAGE.GetPage PATH]
+params:
+  functions_and_methods:
+    returnType: page.Page
+    signatures: [PAGE.GetPage PATH]
 aliases: [/functions/getpage]
 ---
 
@@ -36,9 +35,9 @@ content/
 └── _index.md
 ```
 
-The examples below depict the result of rendering works/paintings/the-mona-lisa.md:
+The examples below depict the result of rendering `works/paintings/the-mona-lisa.md`:
 
-{{< code file=layouts/works/single.html >}}
+```go-html-template {file="layouts/works/page.html"}
 {{ with .GetPage "starry-night" }}
   {{ .Title }} → Starry Night
 {{ end }}
@@ -62,4 +61,4 @@ The examples below depict the result of rendering works/paintings/the-mona-lisa.
 {{ with .GetPage "/works/sculptures/david" }}
   {{ .Title }} → David
 {{ end }}
-{{< /code >}}
+```

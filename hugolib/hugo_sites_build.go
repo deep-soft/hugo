@@ -324,6 +324,14 @@ func (h *HugoSites) assemble(ctx context.Context, l logg.LevelLogger, bcfg *Buil
 		}
 	}
 
+	// Handle new terms from assemblePagesStep2.
+	changes = bcfg.WhatChanged.Drain()
+	if len(changes) > 0 {
+		if err := h.resolveAndClearStateForIdentities(ctx, l, nil, changes); err != nil {
+			return err
+		}
+	}
+
 	h.renderFormats = output.Formats{}
 	for _, s := range h.Sites {
 		s.s.initRenderFormats()
@@ -494,17 +502,17 @@ func (s *Site) executeDeferredTemplates(de *deps.DeferredExecutions) error {
 				defer deferred.Mu.Unlock()
 
 				if !deferred.Executed {
-					tmpl := s.Deps.Tmpl()
-					templ, found := tmpl.Lookup(deferred.TemplateName)
-					if !found {
-						panic(fmt.Sprintf("template %q not found", deferred.TemplateName))
+					tmpl := s.Deps.GetTemplateStore()
+					ti := s.TemplateStore.LookupByPath(deferred.TemplatePath)
+					if ti == nil {
+						panic(fmt.Sprintf("template %q not found", deferred.TemplatePath))
 					}
 
 					if err := func() error {
 						buf := bufferpool.GetBuffer()
 						defer bufferpool.PutBuffer(buf)
 
-						err = tmpl.ExecuteWithContext(deferred.Ctx, templ, buf, deferred.Data)
+						err = tmpl.ExecuteWithContext(deferred.Ctx, ti, buf, deferred.Data)
 						if err != nil {
 							return err
 						}
@@ -577,9 +585,13 @@ func (h *HugoSites) printUnusedTemplatesOnce() error {
 	h.printUnusedTemplatesInit.Do(func() {
 		conf := h.Configs.Base
 		if conf.PrintUnusedTemplates {
-			unusedTemplates := h.Tmpl().(tpl.UnusedTemplatesProvider).UnusedTemplates()
+			unusedTemplates := h.GetTemplateStore().UnusedTemplates()
 			for _, unusedTemplate := range unusedTemplates {
-				h.Log.Warnf("Template %s is unused, source file %s", unusedTemplate.Name(), unusedTemplate.Filename())
+				if unusedTemplate.Fi != nil {
+					h.Log.Warnf("Template %s is unused, source %q", unusedTemplate.PathInfo.Path(), unusedTemplate.Fi.Meta().Filename)
+				} else {
+					h.Log.Warnf("Template %s is unused", unusedTemplate.PathInfo.Path())
+				}
 			}
 		}
 	})
@@ -818,6 +830,7 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 
 	changedPaths := struct {
 		changedFiles []*paths.Path
+		addedFiles   []*paths.Path
 		changedDirs  []*paths.Path
 		deleted      []*paths.Path
 	}{}
@@ -884,13 +897,15 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 			changedPaths.deleted = append(changedPaths.deleted, pss...)
 		} else if ev.isChangedDir {
 			changedPaths.changedDirs = append(changedPaths.changedDirs, pss...)
+		} else if ev.added {
+			changedPaths.addedFiles = append(changedPaths.addedFiles, pss...)
 		} else {
 			changedPaths.changedFiles = append(changedPaths.changedFiles, pss...)
 		}
 	}
 
 	// Find the most specific identity possible.
-	handleChange := func(pathInfo *paths.Path, delete, isDir bool) {
+	handleChange := func(pathInfo *paths.Path, delete, add, isDir bool) {
 		switch pathInfo.Component() {
 		case files.ComponentFolderContent:
 			logger.Println("Source changed", pathInfo.Path())
@@ -909,12 +924,14 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 						if err == nil {
 							f.Close()
 						}
+
 						if err != nil {
 							// Remove all pages and resources below.
-							prefix := pathInfo.Base() + "/"
+							prefix := paths.AddTrailingSlash(pathInfo.Base())
+
 							h.pageTrees.treePages.DeletePrefixAll(prefix)
 							h.pageTrees.resourceTrees.DeletePrefixAll(prefix)
-							changes = append(changes, identity.NewGlobIdentity(prefix+"*"))
+							changes = append(changes, identity.NewGlobIdentity(prefix+"**"))
 						}
 						return err != nil
 					})
@@ -949,12 +966,15 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 				}
 			}
 
-			addedOrChangedContent = append(addedOrChangedContent, pathChange{p: pathInfo, structural: delete, isDir: isDir})
+			structural := delete
+			structural = structural || (add && pathInfo.IsLeafBundle())
+
+			addedOrChangedContent = append(addedOrChangedContent, pathChange{p: pathInfo, structural: structural, isDir: isDir})
 
 		case files.ComponentFolderLayouts:
 			tmplChanged = true
 			templatePath := pathInfo.Unnormalized().TrimLeadingSlash().PathNoLang()
-			if !h.Tmpl().HasTemplate(templatePath) {
+			if !h.GetTemplateStore().HasTemplate(templatePath) {
 				tmplAdded = true
 			}
 
@@ -974,8 +994,9 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 				}
 			} else {
 				logger.Println("Template changed", pathInfo.Path())
-				if templ, found := h.Tmpl().GetIdentity(templatePath); found {
-					changes = append(changes, templ)
+				id := h.GetTemplateStore().GetIdentity(pathInfo.Path())
+				if id != nil {
+					changes = append(changes, id)
 				} else {
 					changes = append(changes, pathInfo)
 				}
@@ -1004,6 +1025,7 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 	}
 
 	changedPaths.deleted = removeDuplicatePaths(changedPaths.deleted)
+	changedPaths.addedFiles = removeDuplicatePaths(changedPaths.addedFiles)
 	changedPaths.changedFiles = removeDuplicatePaths(changedPaths.changedFiles)
 
 	h.Log.Trace(logg.StringFunc(func() string {
@@ -1011,6 +1033,11 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 		sb.WriteString("Resolved paths:\n")
 		sb.WriteString("Deleted:\n")
 		for _, p := range changedPaths.deleted {
+			sb.WriteString("path: " + p.Path())
+			sb.WriteString("\n")
+		}
+		sb.WriteString("Added:\n")
+		for _, p := range changedPaths.addedFiles {
 			sb.WriteString("path: " + p.Path())
 			sb.WriteString("\n")
 		}
@@ -1059,15 +1086,19 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 	}
 
 	for _, deleted := range changedPaths.deleted {
-		handleChange(deleted, true, false)
+		handleChange(deleted, true, false, false)
+	}
+
+	for _, id := range changedPaths.addedFiles {
+		handleChange(id, false, true, false)
 	}
 
 	for _, id := range changedPaths.changedFiles {
-		handleChange(id, false, false)
+		handleChange(id, false, false, false)
 	}
 
 	for _, id := range changedPaths.changedDirs {
-		handleChange(id, false, true)
+		handleChange(id, false, false, true)
 	}
 
 	for _, id := range changes {
@@ -1084,7 +1115,6 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 
 	changed := &WhatChanged{
 		needsPagesAssembly: needsPagesAssemble,
-		identitySet:        make(identity.Identities),
 	}
 	changed.Add(changes...)
 
@@ -1106,17 +1136,39 @@ func (h *HugoSites) processPartialFileEvents(ctx context.Context, l logg.LevelLo
 		}
 	}
 
-	h.Deps.OnChangeListeners.Notify(changed.Changes()...)
+	changes2 := changed.Changes()
+	h.Deps.OnChangeListeners.Notify(changes2...)
 
 	if err := h.resolveAndClearStateForIdentities(ctx, l, cacheBusterOr, changed.Drain()); err != nil {
 		return err
 	}
 
-	if tmplChanged || i18nChanged {
+	if tmplChanged {
 		if err := loggers.TimeTrackfn(func() (logg.LevelLogger, error) {
-			// TODO(bep) this could probably be optimized to somehow
-			// only load the changed templates and its dependencies, but that is non-trivial.
+			depsFinder := identity.NewFinder(identity.FinderConfig{})
 			ll := l.WithField("substep", "rebuild templates")
+			s := h.Sites[0]
+			if err := s.Deps.TemplateStore.RefreshFiles(func(fi hugofs.FileMetaInfo) bool {
+				pi := fi.Meta().PathInfo
+				for _, id := range changes2 {
+					if depsFinder.Contains(pi, id, -1) > 0 {
+						return true
+					}
+				}
+				return false
+			}); err != nil {
+				return ll, err
+			}
+
+			return ll, nil
+		}); err != nil {
+			return err
+		}
+	}
+
+	if i18nChanged {
+		if err := loggers.TimeTrackfn(func() (logg.LevelLogger, error) {
+			ll := l.WithField("substep", "rebuild i18n")
 			var prototype *deps.Deps
 			for i, s := range h.Sites {
 				if err := s.Deps.Compile(prototype); err != nil {

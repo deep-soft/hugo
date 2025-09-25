@@ -3,23 +3,22 @@ title: data.GetJSON
 description: Returns a JSON object from a local or remote JSON file, or an error if the file does not exist.
 categories: []
 keywords: []
-action:
-  aliases: [getJSON]
-  related: []
-  returnType: any
-  signatures: ['data.GetJSON INPUT... [OPTIONS]']
-toc: true
+params:
+  functions_and_methods:
+    aliases: [getJSON]
+    returnType: any
+    signatures: ['data.GetJSON INPUT... [OPTIONS]']
 expiryDate: 2026-02-19 # deprecated 2024-02-19 in v0.123.0
 ---
 
-{{% deprecated-in 0.123.0 %}}
+{{< deprecated-in 0.123.0 >}}
 Instead, use [`transform.Unmarshal`] with a [global resource](g), [page resource](g), or [remote resource](g).
 
 See the [remote data example].
 
 [`transform.Unmarshal`]: /functions/transform/unmarshal/
 [remote data example]: /functions/resources/getremote/#remote-data
-{{% /deprecated-in %}}
+{{< /deprecated-in >}}
 
 Given the following directory structure:
 
@@ -36,9 +35,8 @@ Access the data with either of the following:
 {{ $data := getJSON "other-files/" "books.json" }}
 ```
 
-{{% note %}}
-When working with local data, the file path is relative to the working directory.
-{{% /note %}}
+> [!note]
+> When working with local data, the file path is relative to the working directory.
 
 Access remote data with either of the following:
 
@@ -82,7 +80,7 @@ Add multiple headers using a slice:
 
 ## Global resource alternative
 
-Consider using the [`resources.Get`] function with [`transform.Unmarshal`] when accessing a global resource.
+Consider using the [`resources.Get`](/functions/resources/get/) function with [`transform.Unmarshal`] when accessing a global resource.
 
 ```text
 my-project/
@@ -103,7 +101,7 @@ my-project/
 
 ## Page resource alternative
 
-Consider using the [`Resources.Get`] method with [`transform.Unmarshal`] when accessing a page resource.
+Consider using the [`Resources.Get`][/methods/page/resources/] method with [`transform.Unmarshal`] when accessing a page resource.
 
 ```text
 my-project/
@@ -142,7 +140,8 @@ Consider using the [`resources.GetRemote`] function with [`transform.Unmarshal`]
 {{ end }}
 ```
 
-[`Resources.Get`]: /methods/page/resources/
 [`resources.GetRemote`]: /functions/resources/getremote/
-[`resources.Get`]: /functions/resources/get/
+
+<!-- markdownlint-disable MD053 -->
 [`transform.Unmarshal`]: /functions/transform/unmarshal/
+<!-- markdownlint-enable MD053 -->

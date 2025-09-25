@@ -135,7 +135,7 @@ type GetPageProvider interface {
 // GitInfoProvider provides Git info.
 type GitInfoProvider interface {
 	// GitInfo returns the Git info for this object.
-	GitInfo() source.GitInfo
+	GitInfo() *source.GitInfo
 	// CodeOwners returns the code owners for this object.
 	CodeOwners() []string
 }
@@ -148,10 +148,10 @@ type InSectionPositioner interface {
 	PrevInSection() Page
 }
 
-// InternalDependencies is considered an internal interface.
-type InternalDependencies interface {
-	// GetRelatedDocsHandler is for internal use only.
-	GetRelatedDocsHandler() *RelatedDocsHandler
+// RelatedDocsHandlerProvider is considered an internal interface.
+type RelatedDocsHandlerProvider interface {
+	// GetInternalRelatedDocsHandler is for internal use only.
+	GetInternalRelatedDocsHandler() *RelatedDocsHandler
 }
 
 // OutputFormatsProvider provides the OutputFormats of a Page.
